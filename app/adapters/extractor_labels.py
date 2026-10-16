@@ -23,6 +23,8 @@ _PATTERNS: tuple[tuple[str, str, str, str], ...] = (
         r"\bmonthly\s+(?:household\s+)?income\b(?:\s*\([^)]*\))?\s*[:\-]\s*(?:pkr|rs\.?|₨)?\s*([\d,]+)",
     ),
     ("owns_car", "Owns a car", "bool", r"\bowns\s+a\s+car\b\s*[:\-]\s*(yes|no|true|false)"),
+    ("land_acres", "Land owned (acres)", "int", r"\bland\s+owned\b(?:\s*\([^)]*\))?\s*[:\-]\s*(\d{1,4})"),
+    ("bank_balance_pkr", "Bank balance (PKR)", "int", r"\bbank\s+balance\b(?:\s*\([^)]*\))?\s*[:\-]\s*(?:pkr|rs\.?|₨)?\s*([\d,]+)"),
 )
 
 

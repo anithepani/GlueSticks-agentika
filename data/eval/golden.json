@@ -11,7 +11,9 @@
         "INCOME_LIMIT": "PASS",
         "RESIDENCY": "PASS",
         "HOUSEHOLD_SIZE": "PASS",
-        "ASSET_CAR": "PASS"
+        "ASSET_CAR": "PASS",
+        "ASSET_LAND": "PASS",
+        "BANK_BALANCE": "PASS"
       }
     },
     {
@@ -25,7 +27,9 @@
         "INCOME_LIMIT": "UNKNOWN",
         "RESIDENCY": "PASS",
         "HOUSEHOLD_SIZE": "PASS",
-        "ASSET_CAR": "PASS"
+        "ASSET_CAR": "PASS",
+        "ASSET_LAND": "PASS",
+        "BANK_BALANCE": "PASS"
       }
     },
     {
@@ -39,7 +43,9 @@
         "INCOME_LIMIT": "UNKNOWN",
         "RESIDENCY": "PASS",
         "HOUSEHOLD_SIZE": "PASS",
-        "ASSET_CAR": "PASS"
+        "ASSET_CAR": "PASS",
+        "ASSET_LAND": "PASS",
+        "BANK_BALANCE": "PASS"
       }
     },
     {
@@ -53,7 +59,9 @@
         "INCOME_LIMIT": "PASS",
         "RESIDENCY": "PASS",
         "HOUSEHOLD_SIZE": "PASS",
-        "ASSET_CAR": "PASS"
+        "ASSET_CAR": "PASS",
+        "ASSET_LAND": "PASS",
+        "BANK_BALANCE": "PASS"
       }
     },
     {
@@ -67,7 +75,9 @@
         "INCOME_LIMIT": "FAIL",
         "RESIDENCY": "PASS",
         "HOUSEHOLD_SIZE": "PASS",
-        "ASSET_CAR": "FAIL"
+        "ASSET_CAR": "FAIL",
+        "ASSET_LAND": "FAIL",
+        "BANK_BALANCE": "FAIL"
       }
     }
   ]

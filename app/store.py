@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from app.config import AdapterBundle, intake_extractor
@@ -20,6 +21,24 @@ from app.pipeline import run_pipeline
 from app.seed_cases import load_packets
 
 MAX_INTAKE_CASES = int(os.getenv("WITNESS_MAX_INTAKE", "50"))
+MAX_PDF_B64 = int(os.getenv("WITNESS_MAX_PDF_B64", "4000000"))
+SLA_HOURS = float(os.getenv("WITNESS_SLA_HOURS", "24"))
+OPEN_STATUSES = ("INTAKE", "VERIFIED", "NEEDS_REVIEW", "INFO_REQUESTED")
+
+
+def age_minutes(case: Case, now: datetime | None = None) -> float:
+    try:
+        received = datetime.fromisoformat(case.received_at)
+    except ValueError:
+        return 0.0
+    reference = now or datetime.now(timezone.utc)
+    return max(0.0, (reference - received).total_seconds() / 60.0)
+
+
+def sla_breached(case: Case, now: datetime | None = None) -> bool:
+    if case.status not in ("VERIFIED", "NEEDS_REVIEW", "INFO_REQUESTED"):
+        return False
+    return age_minutes(case, now) > SLA_HOURS * 60.0
 
 
 class CaseStore:
@@ -135,16 +154,21 @@ class CaseStore:
     def _clean_documents(self, documents) -> list[dict]:
         cleaned: list[dict] = []
         for index, raw in enumerate(documents or []):
-            text = str((raw or {}).get("text", "")).strip()
-            if not text:
+            raw = raw or {}
+            text = str(raw.get("text", "")).strip()
+            pdf = raw.get("pdf_base64")
+            if not text and not pdf:
                 continue
-            cleaned.append(
-                {
-                    "doc_id": str((raw or {}).get("doc_id") or f"d{index + 1}"),
-                    "title": str((raw or {}).get("title") or f"Document {index + 1}"),
-                    "text": text,
-                }
-            )
+            entry = {
+                "doc_id": str(raw.get("doc_id") or f"d{index + 1}"),
+                "title": str(raw.get("title") or f"Document {index + 1}"),
+                "text": text,
+            }
+            if pdf:
+                if len(str(pdf)) > MAX_PDF_B64:
+                    raise ValueError(f"document '{entry['title']}' exceeds the size limit")
+                entry["pdf_base64"] = str(pdf)
+            cleaned.append(entry)
         return cleaned
 
     def _next_intake_id(self) -> str:
@@ -185,9 +209,26 @@ class CaseStore:
                 "outcome": case.recommendation.outcome if case.recommendation else None,
                 "verification": case.verification.status if case.verification else None,
                 "decision": case.decision.action if case.decision else None,
+                "assignee": case.assignee,
+                "age_minutes": round(age_minutes(case), 1),
+                "sla_breached": sla_breached(case),
             }
             for case in self.list()
         ]
+
+    def assign(self, case_id: str, officer: str) -> Case:
+        case = self._cases.get(case_id)
+        if case is None:
+            raise KeyError(case_id)
+        officer = (officer or "").strip()
+        if not officer:
+            raise ValueError("officer name is required")
+        case.assignee = officer
+        case.assigned_at = _now()
+        case.touch()
+        case.log("assigned", f"assigned to {officer}")
+        self._bundle.audit.append(case.id, "assigned", officer, {"assignee": officer})
+        return case
 
     def decide(self, case_id: str, officer: str, action: str, reason: str) -> Case:
         case = self._cases.get(case_id)
@@ -230,6 +271,9 @@ class CaseStore:
             "total": len(self._cases),
             "by_status": counters,
             "decided": sum(1 for c in self._cases.values() if c.decision is not None),
+            "unassigned_open": sum(1 for c in self._cases.values() if c.status in OPEN_STATUSES and not c.assignee),
+            "sla_breached": sum(1 for c in self._cases.values() if sla_breached(c)),
+            "sla_hours": SLA_HOURS,
         }
 
 

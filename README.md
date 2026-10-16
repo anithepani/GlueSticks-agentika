@@ -27,11 +27,13 @@ port behind an environment flag, so components can be upgraded without a rewrite
 
 | Flag | Values | Meaning |
 |---|---|---|
-| `READER` | `text` (later: `pdf`) | document reader |
-| `EXTRACTOR` | `fixture`, `llm` | fact extraction |
+| `READER` | `pdf`, `text` | document reader (`pdf` also reads plain text) |
+| `EXTRACTOR` | `fixture`, `labels`, `llm` | fact extraction |
 | `VERIFIER` | `det`, `llm` | abstain / audit |
-| `AUDIT` | `sqlite` (later: `postgres`) | audit storage |
+| `AUDIT` | `sqlite`, `postgres` | audit storage |
 | `LLM_PROVIDER` | `groq`, `gemini` | which free provider the LLM adapters use |
+| `WITNESS_STRICT` | `0`, `1` | refuse to serve if the evaluation gate fails |
+| `WITNESS_SLA_HOURS` | number | case queue SLA threshold |
 
 `EXTRACTOR=llm` asks a model for a value **plus the exact quote**; Witness then grounds
 that quote verbatim, so an invented quote yields no citation and the verifier abstains.
@@ -81,6 +83,19 @@ See `DEPLOY.md`.
   `request_info → resubmit → re-run` loop. Every artifact that lives under `data/`
   has an embedded fallback, so the service is fully functional even if a build does
   not copy `data/` into the image.
+- **Stage 4** — hardening and breadth:
+  - Policy is now **7 clauses** with traceable rule ids; each rule cites the clause
+    it implements and the UI shows it.
+  - **PDF intake** (`READER=pdf`): a PDF is read page-by-page and flows through the
+    same grounding/rules/verify pipeline.
+  - **Postgres audit** (`AUDIT=postgres`) via a linked database service, with a
+    SQLite fallback so the app never dies if the database is unreachable.
+  - **Fail-closed evaluation gate**: with `WITNESS_STRICT=1` the app refuses to
+    serve unless the gate passes; `/health` reports the gate.
+  - **Tamper demo** (`POST /api/audit/tamper-demo`) shows a forged ledger copy
+    breaking the hash chain while the real ledger stays intact.
+  - Officer **assignment + SLA/aging**; **observability** with `x-request-id`,
+    JSON access logs, and `/api/metrics`.
 
 ## Tests
 
@@ -90,7 +105,13 @@ Pure-Python, no network, no API key required:
 .\.venv\Scripts\python.exe tests\test_seed.py
 .\.venv\Scripts\python.exe tests\test_llm.py
 .\.venv\Scripts\python.exe tests\test_intake.py
+.\.venv\Scripts\python.exe tests\test_gate.py
+.\.venv\Scripts\python.exe tests\test_pdf.py
+.\.venv\Scripts\python.exe tests\test_ops.py
 ```
+
+`tools/embed.py` regenerates `app/embedded.py` from `data/`; `tests/test_seed.py`
+fails if it is stale.
 
 ## API
 
@@ -105,8 +126,11 @@ Pure-Python, no network, no API key required:
 | POST | `/api/cases/{id}/decision` | human decision `{officer, action, reason}` |
 | POST | `/api/cases/{id}/resubmit` | supply new evidence after `request_info`; re-runs the pipeline |
 | GET | `/api/cases/{id}/audit` | audit entries for a case |
+| POST | `/api/cases/{id}/assign` | assign a case to an officer |
 | GET | `/api/audit/verify` | recompute the hash chain |
+| POST | `/api/audit/tamper-demo` | show a forged copy breaking the chain (real ledger untouched) |
 | GET | `/api/eval` | run the evaluation gate over the seeded set |
+| GET | `/api/metrics` | request counts, latency, request IDs |
 | POST | `/api/reseed` | idempotent reseed of seeded cases |
 | GET | `/api/diag` | where cases were loaded from (files vs embedded fallback) |
 | GET | `/api/adapters` | which reader/extractor/verifier/audit are active, and whether an LLM key is set |

@@ -103,6 +103,7 @@
     <div id="qlist" class="qlist"></div>
     <div class="foot">
       <button id="verifyBtn" class="btn ghost" style="width:100%">Verify audit chain</button>
+      <button id="tamperBtn" class="btn ghost" style="width:100%;margin-top:8px">Tamper demo</button>
       <div id="chain" class="muted" style="margin-top:8px;font-size:12.5px"></div>
       <button id="reseedBtn" class="btn ghost" style="width:100%;margin-top:10px">Reseed cases</button>
     </div>
@@ -116,6 +117,7 @@
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pill = (s) => `<span class="pill ${esc(s)}">${esc(String(s ?? '—').replace(/_/g,' '))}</span>`;
+const fmtAge = (m) => m == null ? '' : (m < 60 ? Math.round(m) + 'm' : Math.round(m/60*10)/10 + 'h');
 let cases = [];
 let current = null;
 
@@ -146,6 +148,7 @@ async function loadQueue(){
       <div class="qname">${esc(c.applicant_name)}</div>
       <div class="qmeta"><span>${esc(c.id)}</span>${pill(c.status)}</div>
       <div class="qmeta"><span class="muted">${esc(c.province || '')}</span><span class="muted">${esc(c.outcome || '')}${c.verification ? ' · ' + esc(c.verification) : ''}</span></div>
+      <div class="qmeta"><span class="muted">${c.assignee ? esc(c.assignee) : 'unassigned'}</span><span class="${c.sla_breached ? 'bad' : 'muted'}">${fmtAge(c.age_minutes)}${c.sla_breached ? ' · SLA' : ''}</span></div>
     </button>`).join('');
 }
 
@@ -186,6 +189,7 @@ function render(){
       <td><code>${esc(r.rule_id)}</code><div class="muted" style="font-size:11.5px">${esc(r.title)}</div></td>
       <td>${pill(r.status)}</td>
       <td class="muted">${esc(r.detail)}</td>
+      <td class="muted" style="white-space:nowrap">${r.policy_ref ? esc(r.policy_ref) : '—'}</td>
     </tr>`).join('');
 
   const checks = v.checks.map(chk => `<div class="e"><span class="${chk.ok ? 'ok' : 'bad'}">${chk.ok ? '✓' : '✗'}</span><span>${esc(chk.check)} · ${esc(chk.fact)}</span><span class="muted">${esc(chk.note)}</span></div>`).join('');
@@ -201,6 +205,15 @@ function render(){
     </div>`).join('') : '';
 
   const docs = c.documents.map(d => `<details><summary>${esc(d.title)} — ${esc(d.doc_id)}</summary><pre>${esc(d.text)}</pre></details>`).join('');
+
+  const isOpen = decidable || awaiting;
+  const assignHtml = isOpen ? `
+    <form class="form" onsubmit="submitAssign(event)" style="margin-bottom:10px">
+      <div class="row">
+        <div class="field" style="max-width:280px"><label>Assign this case to an officer</label><input id="assignee" value="${esc(c.assignee || '')}" placeholder="Officer name" required /></div>
+        <div style="display:flex;align-items:flex-end"><button class="btn ghost" type="submit">Assign</button></div>
+      </div>
+    </form>` : '';
 
   let decisionHtml;
   if(decidable){
@@ -238,7 +251,9 @@ function render(){
 
   $('detail').innerHTML = `
     <h1>${esc(c.applicant_name)} ${pill(c.status)}</h1>
-    <div class="muted">${esc(c.id)} · CNIC ${esc(c.applicant_cnic || '—')} · ${esc(c.province || '—')}</div>
+    <div class="muted">${esc(c.id)} · CNIC ${esc(c.applicant_cnic || '—')} · ${esc(c.province || '—')}
+      · assigned to <b>${esc(c.assignee || 'nobody')}</b>
+      · age ${fmtAge(c.age_minutes)} ${c.sla_breached ? '<span class="bad">· SLA breached</span>' : ''}</div>
 
     <div class="banner ${good ? 'good' : (c.status==='DENIED' ? 'bad' : 'warn')}">
       <b>Pipeline recommendation: ${pill(rec.outcome)}</b>
@@ -252,7 +267,8 @@ function render(){
     <table><thead><tr><th>Field</th><th>Value</th><th>Citation</th></tr></thead><tbody>${facts}</tbody></table>
 
     <h2>Deterministic rules</h2>
-    <table><thead><tr><th>Rule</th><th>Status</th><th>Detail</th></tr></thead><tbody>${rules}</tbody></table>
+    <table><thead><tr><th>Rule</th><th>Status</th><th>Detail</th><th>Policy clause</th></tr></thead><tbody>${rules}</tbody></table>
+    <div class="muted" style="font-size:12px;margin-top:8px">Every rule cites the written clause it implements — see the <a href="#" onclick="showPolicy();return false" style="color:var(--accent)">policy</a>.</div>
 
     <h2>Independent verification ${pill(v.status)}</h2>
     ${reasons}
@@ -262,6 +278,7 @@ function render(){
     ${docs}
 
     <h2>Human decision</h2>
+    ${assignHtml}
     ${decisionHtml}
 
     <h2>Audit ledger</h2>
@@ -279,6 +296,17 @@ async function submitDecision(e){
     });
     render(); loadQueue();
   }catch(err){ alert('Decision rejected: ' + err.message); }
+}
+
+async function submitAssign(e){
+  e.preventDefault();
+  try{
+    current = await api('/api/cases/' + encodeURIComponent(current.id) + '/assign', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({officer: $('assignee').value.trim()})
+    });
+    render(); loadQueue();
+  }catch(err){ alert('Assign rejected: ' + err.message); }
 }
 
 async function submitResubmit(e){
@@ -313,6 +341,17 @@ async function verifyChain(){
   }catch(e){ $('chain').innerHTML = `<span class="bad">verify failed</span>`; }
 }
 
+async function tamper(){
+  $('chain').innerHTML = '<span class="muted">tampering with a copy…</span>';
+  try{
+    const r = await api('/api/audit/tamper-demo', {method:'POST'});
+    $('chain').innerHTML =
+      `<span class="ok">✓ chain intact</span> (${r.intact.checked} entries)<br/>` +
+      `<span class="bad">✗ forged copy detected at #${r.tampered.broken_at}</span><br/>` +
+      `<span class="ok">✓ real ledger restored/untouched</span>`;
+  }catch(e){ $('chain').innerHTML = `<span class="bad">tamper demo failed</span>`; }
+}
+
 async function reseed(){
   await api('/api/reseed', {method:'POST'});
   current = null;
@@ -331,24 +370,45 @@ function showIntake(){
         <div class="field" style="max-width:200px"><label>CNIC (optional)</label><input id="iCnic" placeholder="35202-0000000-0" /></div>
         <div class="field" style="max-width:200px"><label>Province (optional)</label><input id="iProvince" placeholder="Punjab" /></div>
       </div>
-      <div class="field"><label>Document 1 (required)</label><textarea id="iDoc1" required>Form B-1: Income Support Application
+      <div class="field"><label>Upload a PDF (optional — takes precedence over the text below)</label><input id="iPdf" type="file" accept="application/pdf" /></div>
+      <div class="field"><label>Document 1 (text; ignored if a PDF is uploaded)</label><textarea id="iDoc1">Form B-1: Income Support Application
 Name: Fatima Noor
 Age: 46 years
 Province of residence: Punjab
 Household size: 6 persons
 Monthly household income: PKR 38,000
-Owns a car: No</textarea></div>
+Owns a car: No
+Land owned (acres): 0
+Bank balance: PKR 9,000</textarea></div>
       <div class="field"><label>Document 2 (optional — use it to show a contradiction)</label><textarea id="iDoc2" placeholder="e.g. a second income figure that conflicts with the first"></textarea></div>
       <div><button class="btn" type="submit">Run the pipeline</button></div>
     </form>`;
 }
 
+function fileToBase64(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = () => reject(new Error('could not read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function submitIntake(e){
   e.preventDefault();
-  const documents = [{title:'Intake form', text: $('iDoc1').value}];
-  const extra = $('iDoc2').value.trim();
-  if(extra) documents.push({title:'Additional evidence', text: extra});
+  let documents;
+  const file = $('iPdf').files[0];
   try{
+    if(file){
+      const base64 = await fileToBase64(file);
+      documents = [{title: file.name, pdf_base64: base64}];
+    }else{
+      const text = $('iDoc1').value.trim();
+      if(!text){ alert('Provide a PDF or some document text.'); return; }
+      documents = [{title:'Intake form', text}];
+      const extra = $('iDoc2').value.trim();
+      if(extra) documents.push({title:'Additional evidence', text: extra});
+    }
     current = await api('/api/cases', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({applicant_name: $('iName').value.trim(), applicant_cnic: $('iCnic').value.trim(), province: $('iProvince').value.trim(), documents})
@@ -394,6 +454,7 @@ async function showPolicy(){
 }
 
 $('verifyBtn').onclick = verifyChain;
+$('tamperBtn').onclick = tamper;
 $('reseedBtn').onclick = reseed;
 pollHealth(); setInterval(pollHealth, 5000);
 loadQueue();

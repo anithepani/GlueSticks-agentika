@@ -10,13 +10,14 @@ from app.adapters import (
     DeterministicVerifier,
     FixtureExtractor,
     LabelsExtractor,
+    PdfReader,
     PmtRules,
     SqliteAudit,
     TextReader,
 )
 from app.adapters.extractor_llm import LLMExtractor
 from app.adapters.llm_client import build_llm_client
-from app.adapters.resilient import ResilientExtractor, ResilientVerifier
+from app.adapters.resilient import ResilientAudit, ResilientExtractor, ResilientVerifier
 from app.adapters.verifier_llm import LLMVerifier
 from app.interfaces import AuditLog, Extractor, Reader, RulesEngine, Verifier
 
@@ -25,7 +26,7 @@ DATA_DIR = Path(os.getenv("WITNESS_DATA_DIR", str(ROOT / "data")))
 CASES_DIR = DATA_DIR / "cases"
 POLICY_DIR = DATA_DIR / "policy"
 
-STAGE = int(os.getenv("WITNESS_STAGE", "3"))
+STAGE = int(os.getenv("WITNESS_STAGE", "4"))
 
 
 @dataclass
@@ -40,7 +41,9 @@ class AdapterBundle:
 def _reader(name: str) -> Reader:
     if name == "text":
         return TextReader()
-    raise ValueError(f"READER '{name}' is not implemented in this stage")
+    if name == "pdf":
+        return PdfReader()
+    raise ValueError(f"READER '{name}' is not implemented")
 
 
 def _extractor(name: str) -> Extractor:
@@ -81,14 +84,22 @@ def _verifier(name: str) -> Verifier:
 
 
 def _audit(name: str) -> AuditLog:
+    sqlite = SqliteAudit(os.getenv("AUDIT_DB", str(DATA_DIR / "audit.db")))
     if name == "sqlite":
-        return SqliteAudit(os.getenv("AUDIT_DB", str(DATA_DIR / "audit.db")))
+        return sqlite
+    if name == "postgres":
+        from app.adapters.audit_postgres import try_postgres
+
+        primary = try_postgres()
+        if primary is None:
+            return sqlite
+        return ResilientAudit(primary, sqlite)
     raise ValueError(f"AUDIT '{name}' is not implemented")
 
 
 def build_adapters() -> AdapterBundle:
     return AdapterBundle(
-        reader=_reader(os.getenv("READER", "text")),
+        reader=_reader(os.getenv("READER", "pdf")),
         extractor=_extractor(os.getenv("EXTRACTOR", "fixture")),
         rules=PmtRules(),
         verifier=_verifier(os.getenv("VERIFIER", "det")),

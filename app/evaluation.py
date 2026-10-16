@@ -11,54 +11,12 @@ import json
 from pathlib import Path
 
 from app.config import POLICY_DIR, AdapterBundle
+from app.embedded import DEFAULT_GOLDEN
 from app.models import STATUS_DENIED
 from app.pipeline import run_pipeline
 from app.seed_cases import load_packets
 
 GOLDEN_PATH = POLICY_DIR.parent / "eval" / "golden.json"
-
-DEFAULT_GOLDEN: list[dict] = [
-    {
-        "id": "CASE-2026-0001",
-        "status": "VERIFIED",
-        "outcome": "ELIGIBLE",
-        "verification": "OK",
-        "verification_has_reasons": False,
-        "rules": {"AGE_ADULT": "PASS", "INCOME_LIMIT": "PASS", "RESIDENCY": "PASS", "HOUSEHOLD_SIZE": "PASS", "ASSET_CAR": "PASS"},
-    },
-    {
-        "id": "CASE-2026-0002",
-        "status": "NEEDS_REVIEW",
-        "outcome": "NEEDS_REVIEW",
-        "verification": "ABSTAIN",
-        "verification_has_reasons": True,
-        "rules": {"AGE_ADULT": "PASS", "INCOME_LIMIT": "UNKNOWN", "RESIDENCY": "PASS", "HOUSEHOLD_SIZE": "PASS", "ASSET_CAR": "PASS"},
-    },
-    {
-        "id": "CASE-2026-0003",
-        "status": "NEEDS_REVIEW",
-        "outcome": "NEEDS_REVIEW",
-        "verification": "ABSTAIN",
-        "verification_has_reasons": True,
-        "rules": {"AGE_ADULT": "PASS", "INCOME_LIMIT": "UNKNOWN", "RESIDENCY": "PASS", "HOUSEHOLD_SIZE": "PASS", "ASSET_CAR": "PASS"},
-    },
-    {
-        "id": "CASE-2026-0004",
-        "status": "NEEDS_REVIEW",
-        "outcome": "NEEDS_REVIEW",
-        "verification": "ABSTAIN",
-        "verification_has_reasons": True,
-        "rules": {"AGE_ADULT": "PASS", "INCOME_LIMIT": "PASS", "RESIDENCY": "PASS", "HOUSEHOLD_SIZE": "PASS", "ASSET_CAR": "PASS"},
-    },
-    {
-        "id": "CASE-2026-0005",
-        "status": "NEEDS_REVIEW",
-        "outcome": "NEEDS_REVIEW",
-        "verification": "OK",
-        "verification_has_reasons": False,
-        "rules": {"AGE_ADULT": "PASS", "INCOME_LIMIT": "FAIL", "RESIDENCY": "PASS", "HOUSEHOLD_SIZE": "PASS", "ASSET_CAR": "FAIL"},
-    },
-]
 
 PRE_HUMAN_STATUSES = ("INTAKE", "VERIFIED", "NEEDS_REVIEW")
 

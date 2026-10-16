@@ -27,7 +27,9 @@ Age: 46 years
 Province of residence: Punjab
 Household size: 6 persons
 Monthly household income: PKR 38,000
-Owns a car: No"""
+Owns a car: No
+Land owned (acres): 0
+Bank balance: PKR 9,000"""
 
 CONFLICT_EXTRA = "Income Verification Note\nMonthly household income (revised): PKR 150,000"
 

@@ -7,7 +7,7 @@
     {
       "doc_id": "d1",
       "title": "Form B-1 — Income Support Application",
-      "text": "Form B-1: Income Support Application\nName: Imran Shah\nCNIC: 17301-2222222-3\nAge: 52 years\nProvince of residence: Khyber Pakhtunkhwa\nHousehold size: 6 persons\nOwns a car: No\nNote: income section left blank at intake."
+      "text": "Form B-1: Income Support Application\nName: Imran Shah\nCNIC: 17301-2222222-3\nAge: 52 years\nProvince of residence: Khyber Pakhtunkhwa\nHousehold size: 6 persons\nOwns a car: No\nLand owned (acres): 1\nBank balance: PKR 10,000\nNote: income section left blank at intake."
     }
   ],
   "extraction": [
@@ -15,6 +15,8 @@
     { "key": "province", "label": "Province", "quote": "Province of residence: Khyber Pakhtunkhwa", "value": "Khyber Pakhtunkhwa", "doc_id": "d1" },
     { "key": "household_size", "label": "Household size", "quote": "Household size: 6 persons", "value": 6, "doc_id": "d1" },
     { "key": "monthly_income_pkr", "label": "Monthly income (PKR)", "quote": "Monthly household income: PKR 30,000", "value": 30000, "doc_id": "d1" },
-    { "key": "owns_car", "label": "Owns a car", "quote": "Owns a car: No", "value": false, "doc_id": "d1" }
+    { "key": "owns_car", "label": "Owns a car", "quote": "Owns a car: No", "value": false, "doc_id": "d1" },
+    { "key": "land_acres", "label": "Land owned (acres)", "quote": "Land owned (acres): 1", "value": 1, "doc_id": "d1" },
+    { "key": "bank_balance_pkr", "label": "Bank balance (PKR)", "quote": "Bank balance: PKR 10,000", "value": 10000, "doc_id": "d1" }
   ]
 }

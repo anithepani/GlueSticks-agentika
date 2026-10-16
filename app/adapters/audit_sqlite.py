@@ -26,6 +26,31 @@ def chain_hash(prev_hash: str, body: dict) -> str:
     return hashlib.sha256((prev_hash + canonical(body)).encode("utf-8")).hexdigest()
 
 
+def body_of(entry: dict) -> dict:
+    return {
+        "ts": entry["ts"],
+        "case_id": entry["case_id"],
+        "event": entry["event"],
+        "actor": entry["actor"],
+        "payload": entry["payload"],
+    }
+
+
+def verify_entries(entries: list[dict]) -> dict:
+    """Recompute a hash chain over entries and report the first break.
+
+    Adapter-agnostic: works on any list of entry dicts, so it can also be used to
+    audit a *copy* of the ledger without touching stored data.
+    """
+    prev = GENESIS
+    for entry in entries:
+        expected = chain_hash(prev, body_of(entry))
+        if entry.get("prev_hash") != prev or expected != entry.get("hash"):
+            return {"ok": False, "checked": entry.get("seq"), "total": len(entries), "broken_at": entry.get("seq")}
+        prev = entry["hash"]
+    return {"ok": True, "checked": len(entries), "total": len(entries), "head": prev}
+
+
 class SqliteAudit:
     name = "sqlite"
 
@@ -106,23 +131,4 @@ class SqliteAudit:
         return row is not None
 
     def verify(self) -> dict:
-        entries = self.entries()
-        prev = GENESIS
-        for entry in entries:
-            body = {
-                "ts": entry["ts"],
-                "case_id": entry["case_id"],
-                "event": entry["event"],
-                "actor": entry["actor"],
-                "payload": entry["payload"],
-            }
-            expected = chain_hash(prev, body)
-            if entry["prev_hash"] != prev or expected != entry["hash"]:
-                return {
-                    "ok": False,
-                    "checked": entry["seq"],
-                    "total": len(entries),
-                    "broken_at": entry["seq"],
-                }
-            prev = entry["hash"]
-        return {"ok": True, "checked": len(entries), "total": len(entries), "head": prev}
+        return verify_entries(self.entries())

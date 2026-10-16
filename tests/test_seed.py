@@ -39,7 +39,20 @@ def main() -> int:
 
     check_embedded_golden()
     check_embedded_policy()
+    check_generator_sync()
     return 0
+
+
+def check_generator_sync() -> None:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("embed_tool", REPO / "tools" / "embed.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    rendered = module.render()
+    actual = (REPO / "app" / "embedded.py").read_text(encoding="utf-8")
+    assert rendered == actual, "app/embedded.py is stale — run: python tools/embed.py"
+    print("OK: app/embedded.py is in sync with data/ (regenerate with python tools/embed.py)")
 
 
 def check_embedded_golden() -> None:

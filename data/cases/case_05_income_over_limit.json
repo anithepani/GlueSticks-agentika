@@ -7,7 +7,7 @@
     {
       "doc_id": "d1",
       "title": "Form B-1 — Income Support Application",
-      "text": "Form B-1: Income Support Application\nName: Sana Malik\nCNIC: 33100-3333333-4\nAge: 38 years\nProvince of residence: Punjab\nHousehold size: 4 persons\nMonthly household income: PKR 120,000\nOwns a car: Yes\nDeclaration: I declare the above is true and complete."
+      "text": "Form B-1: Income Support Application\nName: Sana Malik\nCNIC: 33100-3333333-4\nAge: 38 years\nProvince of residence: Punjab\nHousehold size: 4 persons\nMonthly household income: PKR 120,000\nOwns a car: Yes\nLand owned (acres): 4\nBank balance: PKR 200,000\nDeclaration: I declare the above is true and complete."
     }
   ],
   "extraction": [
@@ -15,6 +15,8 @@
     { "key": "province", "label": "Province", "quote": "Province of residence: Punjab", "value": "Punjab", "doc_id": "d1" },
     { "key": "household_size", "label": "Household size", "quote": "Household size: 4 persons", "value": 4, "doc_id": "d1" },
     { "key": "monthly_income_pkr", "label": "Monthly income (PKR)", "quote": "Monthly household income: PKR 120,000", "value": 120000, "doc_id": "d1" },
-    { "key": "owns_car", "label": "Owns a car", "quote": "Owns a car: Yes", "value": true, "doc_id": "d1" }
+    { "key": "owns_car", "label": "Owns a car", "quote": "Owns a car: Yes", "value": true, "doc_id": "d1" },
+    { "key": "land_acres", "label": "Land owned (acres)", "quote": "Land owned (acres): 4", "value": 4, "doc_id": "d1" },
+    { "key": "bank_balance_pkr", "label": "Bank balance (PKR)", "quote": "Bank balance: PKR 200,000", "value": 200000, "doc_id": "d1" }
   ]
 }

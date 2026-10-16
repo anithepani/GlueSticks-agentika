@@ -75,6 +75,7 @@ class RuleResult:
     detail: str
     observed: Any = None
     expected: Any = None
+    policy_ref: str = ""
 
 
 @dataclass
@@ -112,6 +113,9 @@ class Case:
     recommendation: Recommendation | None = None
     decision: Decision | None = None
     history: list[dict] = field(default_factory=list)
+    received_at: str = field(default_factory=now_iso)
+    assignee: str | None = None
+    assigned_at: str | None = None
     updated_at: str = field(default_factory=now_iso)
 
     def to_dict(self) -> dict:

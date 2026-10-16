@@ -89,19 +89,42 @@ Set these in **Settings → Environment Variables**, then **Rebuild → Deploy**
 
 ```
 PORT=8000
-WITNESS_STAGE=3
-READER=text
+WITNESS_STAGE=4
+READER=pdf
 EXTRACTOR=llm
 VERIFIER=llm
+AUDIT=postgres
 LLM_PROVIDER=groq
 GROQ_API_KEY=<paste the key — never commit it>
 GROQ_MODEL=llama-3.3-70b-versatile
+WITNESS_STRICT=1
+WITNESS_SLA_HOURS=24
 ```
 
 `EXTRACTOR=llm`/`VERIFIER=llm` need no key to be safe: with no key — or if the API
 errors or rate-limits mid-demo — Witness falls back to the deterministic
 label/fixture path, so a case is never dropped. Check `GET /api/adapters` to confirm
 what is live, and `GET /api/eval` to confirm the gate still passes.
+
+## Postgres audit ledger (durable across redeploys)
+
+The SQLite ledger lives inside the container, so a redeploy starts a fresh chain.
+For a durable ledger, deploy the managed Postgres template and link it:
+
+```powershell
+npx -y @alternatefutures/acc services create --kind template --template postgres --name witness-db -y
+npx -y @alternatefutures/acc services -p witness-agentika link witness-db alternate-echo-whale-5578-github
+npx -y @alternatefutures/acc services -p witness-agentika info cmvbc3e5706exe41rs9g87kmn
+```
+
+Linking injects the connection string into the app service (as `DATABASE_URL` /
+`POSTGRES_URL`). Set `AUDIT=postgres`, **Rebuild → Deploy**, then confirm with:
+
+- `GET /api/adapters` → `"audit": "postgres(fallback:sqlite)"`
+- `GET /api/audit/verify` → `{"ok": true, "ledger": "postgres", ...}`
+
+Because the ledger is now outside the container, a decision recorded before a
+**Redeploy** is still there afterwards — the redeploy no longer resets the chain.
 
 ---
 

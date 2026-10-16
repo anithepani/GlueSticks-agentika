@@ -6,6 +6,9 @@ Source-tab port can never drift from what the app listens on.
 
 from __future__ import annotations
 
+import os
+import time
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -16,23 +19,73 @@ from pydantic import BaseModel
 from app import __version__
 from app.config import CASES_DIR, POLICY_DIR, STAGE, build_adapters, describe_adapters
 from app.evaluation import evaluate
+from app.observability import Metrics, log_json
 from app.policy import POLICY_MARKDOWN
 from app.store import CaseStore
+from app.tamper_demo import tamper_demo
 
 STATIC_DIR = Path(__file__).parent / "static"
+METRICS = Metrics()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    METRICS.reset()
     bundle = build_adapters()
     store = CaseStore(bundle, CASES_DIR)
     store.seed()
+    report = evaluate(bundle)
     app.state.bundle = bundle
     app.state.store = store
+    app.state.gate = {
+        "all_passed": report["all_passed"],
+        "metrics": report["metrics"],
+        "invariants": report["invariants"],
+    }
+    if os.getenv("WITNESS_STRICT", "0") == "1" and not report["all_passed"]:
+        raise RuntimeError(
+            "evaluation gate failed and WITNESS_STRICT=1: refusing to serve. See /api/eval."
+        )
     yield
 
 
 app = FastAPI(title="Witness", version=__version__, lifespan=lifespan)
+
+
+@app.middleware("http")
+async def observe(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        elapsed = (time.perf_counter() - started) * 1000
+        METRICS.record(request.url.path, 500, elapsed)
+        log_json(
+            {
+                "event": "request",
+                "method": request.method,
+                "path": request.url.path,
+                "status": 500,
+                "ms": round(elapsed, 1),
+                "request_id": request_id,
+            }
+        )
+        raise
+    elapsed = (time.perf_counter() - started) * 1000
+    response.headers["x-request-id"] = request_id
+    METRICS.record(request.url.path, response.status_code, elapsed)
+    log_json(
+        {
+            "event": "request",
+            "method": request.method,
+            "path": request.url.path,
+            "status": response.status_code,
+            "ms": round(elapsed, 1),
+            "request_id": request_id,
+        }
+    )
+    return response
 
 
 class DecisionIn(BaseModel):
@@ -44,7 +97,8 @@ class DecisionIn(BaseModel):
 class DocumentIn(BaseModel):
     doc_id: str | None = None
     title: str | None = None
-    text: str
+    text: str = ""
+    pdf_base64: str | None = None
 
 
 class IntakeIn(BaseModel):
@@ -58,13 +112,24 @@ class ResubmitIn(BaseModel):
     documents: list[DocumentIn]
 
 
+class AssignIn(BaseModel):
+    officer: str
+
+
 def _store(request: Request) -> CaseStore:
     return request.app.state.store
 
 
 @app.get("/health")
-def health() -> dict:
-    return {"status": "ok", "service": "witness", "version": __version__, "stage": STAGE}
+def health(request: Request) -> dict:
+    gate = getattr(request.app.state, "gate", None)
+    return {
+        "status": "ok",
+        "service": "witness",
+        "version": __version__,
+        "stage": STAGE,
+        "gate": gate,
+    }
 
 
 @app.get("/api/info")
@@ -111,6 +176,17 @@ def resubmit(case_id: str, payload: ResubmitIn, request: Request) -> dict:
     return case.to_dict()
 
 
+@app.post("/api/cases/{case_id}/assign")
+def assign(case_id: str, payload: AssignIn, request: Request) -> dict:
+    try:
+        case = _store(request).assign(case_id, payload.officer)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="case not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return case.to_dict()
+
+
 @app.get("/api/eval")
 def eval_report(request: Request) -> dict:
     return evaluate(request.app.state.bundle)
@@ -146,6 +222,11 @@ def audit_verify(request: Request) -> dict:
     return request.app.state.bundle.audit.verify()
 
 
+@app.post("/api/audit/tamper-demo")
+def audit_tamper_demo(request: Request) -> dict:
+    return tamper_demo(request.app.state.bundle.audit)
+
+
 @app.post("/api/reseed")
 def reseed(request: Request) -> dict:
     created = _store(request).reseed()
@@ -157,9 +238,17 @@ def stats(request: Request) -> dict:
     return _store(request).stats()
 
 
+@app.get("/api/metrics")
+def metrics(request: Request) -> dict:
+    snapshot = METRICS.snapshot()
+    snapshot["gate"] = getattr(request.app.state, "gate", None)
+    snapshot["cases"] = _store(request).stats()
+    return snapshot
+
+
 @app.get("/api/diag")
 def diag(request: Request) -> dict:
-    return _store(request).diag()
+    return {**_store(request).diag(), "gate": getattr(request.app.state, "gate", None)}
 
 
 @app.get("/api/adapters")
