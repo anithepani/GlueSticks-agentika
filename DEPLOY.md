@@ -126,6 +126,15 @@ Linking injects the connection string into the app service (as `DATABASE_URL` /
 Because the ledger is now outside the container, a decision recorded before a
 **Redeploy** is still there afterwards — the redeploy no longer resets the chain.
 
+> **Placement caveat (observed).** Service linking resolves the target as
+> `<name>.<project>.internal`, which is a **cluster-local** name. If the app and the
+> database land on different providers (as ours did: app `10.43.x`, database
+> `10.233.x`), that name does not resolve and the app **degrades to the embedded
+> SQLite ledger** instead of failing. `GET /api/adapters` reports this honestly via
+> `audit_requested` / `audit_active` / `audit_degraded` / `audit_note`. To get a
+> durable ledger, the two services must be co-located on the same provider/cluster.
+> Witness is built so that a missing or unreachable database never drops a case.
+
 ---
 
 ## Troubleshooting (from the organizers' guide)

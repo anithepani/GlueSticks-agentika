@@ -109,12 +109,23 @@ def build_adapters() -> AdapterBundle:
 
 def describe_adapters(bundle: AdapterBundle) -> dict:
     client = build_llm_client()
+    requested = os.getenv("AUDIT", "sqlite")
+    active = bundle.audit.name
+    degraded = requested != "sqlite" and not active.startswith(requested)
     return {
         "reader": bundle.reader.name,
         "extractor": bundle.extractor.name,
         "rules": bundle.rules.name,
         "verifier": bundle.verifier.name,
-        "audit": bundle.audit.name,
+        "audit": active,
+        "audit_requested": requested,
+        "audit_active": active,
+        "audit_degraded": degraded,
+        "audit_note": (
+            f"requested '{requested}' but running '{active}' (linked host unreachable from this provider)"
+            if degraded
+            else "as requested"
+        ),
         "llm_provider": os.getenv("LLM_PROVIDER", "groq"),
         "llm_configured": client is not None,
         "llm_model": client.model if client else None,
