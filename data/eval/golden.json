@@ -1,0 +1,74 @@
+{
+  "cases": [
+    {
+      "id": "CASE-2026-0001",
+      "status": "VERIFIED",
+      "outcome": "ELIGIBLE",
+      "verification": "OK",
+      "verification_has_reasons": false,
+      "rules": {
+        "AGE_ADULT": "PASS",
+        "INCOME_LIMIT": "PASS",
+        "RESIDENCY": "PASS",
+        "HOUSEHOLD_SIZE": "PASS",
+        "ASSET_CAR": "PASS"
+      }
+    },
+    {
+      "id": "CASE-2026-0002",
+      "status": "NEEDS_REVIEW",
+      "outcome": "NEEDS_REVIEW",
+      "verification": "ABSTAIN",
+      "verification_has_reasons": true,
+      "rules": {
+        "AGE_ADULT": "PASS",
+        "INCOME_LIMIT": "UNKNOWN",
+        "RESIDENCY": "PASS",
+        "HOUSEHOLD_SIZE": "PASS",
+        "ASSET_CAR": "PASS"
+      }
+    },
+    {
+      "id": "CASE-2026-0003",
+      "status": "NEEDS_REVIEW",
+      "outcome": "NEEDS_REVIEW",
+      "verification": "ABSTAIN",
+      "verification_has_reasons": true,
+      "rules": {
+        "AGE_ADULT": "PASS",
+        "INCOME_LIMIT": "UNKNOWN",
+        "RESIDENCY": "PASS",
+        "HOUSEHOLD_SIZE": "PASS",
+        "ASSET_CAR": "PASS"
+      }
+    },
+    {
+      "id": "CASE-2026-0004",
+      "status": "NEEDS_REVIEW",
+      "outcome": "NEEDS_REVIEW",
+      "verification": "ABSTAIN",
+      "verification_has_reasons": true,
+      "rules": {
+        "AGE_ADULT": "PASS",
+        "INCOME_LIMIT": "PASS",
+        "RESIDENCY": "PASS",
+        "HOUSEHOLD_SIZE": "PASS",
+        "ASSET_CAR": "PASS"
+      }
+    },
+    {
+      "id": "CASE-2026-0005",
+      "status": "NEEDS_REVIEW",
+      "outcome": "NEEDS_REVIEW",
+      "verification": "OK",
+      "verification_has_reasons": false,
+      "rules": {
+        "AGE_ADULT": "PASS",
+        "INCOME_LIMIT": "FAIL",
+        "RESIDENCY": "PASS",
+        "HOUSEHOLD_SIZE": "PASS",
+        "ASSET_CAR": "FAIL"
+      }
+    }
+  ]
+}

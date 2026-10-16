@@ -14,7 +14,6 @@ sys.path.insert(0, str(REPO))
 
 from app.seed_cases import DEFAULT_CASES, load_packets
 import app.seed_cases as seed_cases
-
 CASES_DIR = REPO / "data" / "cases"
 
 
@@ -37,7 +36,31 @@ def main() -> int:
     packets, source, diagnostics = load_packets(Path("__definitely_missing__"))
     assert source == "embedded" and len(packets) == len(from_files), (source, len(packets))
     print(f"OK: loader falls back to {source} with {len(packets)} packets when no files exist")
+
+    check_embedded_golden()
+    check_embedded_policy()
     return 0
+
+
+def check_embedded_golden() -> None:
+    from app.evaluation import DEFAULT_GOLDEN
+
+    golden_path = REPO / "data" / "eval" / "golden.json"
+    assert golden_path.exists(), "data/eval/golden.json missing"
+    file_cases = json.loads(golden_path.read_text(encoding="utf-8"))["cases"]
+    assert file_cases == DEFAULT_GOLDEN, "embedded golden drifted from data/eval/golden.json"
+    print(f"OK: {len(file_cases)} embedded golden expectations match data/eval/golden.json")
+
+
+def check_embedded_policy() -> None:
+    from app.policy import POLICY_MARKDOWN
+
+    policy_path = REPO / "data" / "policy" / "rules.md"
+    assert policy_path.exists(), "data/policy/rules.md missing"
+    assert policy_path.read_text(encoding="utf-8").strip() == POLICY_MARKDOWN.strip(), (
+        "embedded policy drifted from data/policy/rules.md"
+    )
+    print("OK: embedded policy matches data/policy/rules.md")
 
 
 if __name__ == "__main__":

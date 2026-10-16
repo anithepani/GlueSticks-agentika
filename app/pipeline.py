@@ -32,7 +32,8 @@ def build_recommendation(verification, rules) -> Recommendation:
     )
 
 
-def run_pipeline(packet: dict, bundle: AdapterBundle) -> Case:
+def run_pipeline(packet: dict, bundle: AdapterBundle, extractor=None) -> Case:
+    active_extractor = extractor or bundle.extractor
     documents = bundle.reader.read(packet)
     case = Case(
         id=str(packet["id"]),
@@ -43,9 +44,9 @@ def run_pipeline(packet: dict, bundle: AdapterBundle) -> Case:
     )
     case.log("intake", f"{len(documents)} document(s) read via '{bundle.reader.name}' reader")
 
-    case.facts = bundle.extractor.extract(documents, packet)
+    case.facts = active_extractor.extract(documents, packet)
     grounded = sum(1 for fact in case.facts if fact.citation is not None)
-    case.log("extract", f"{len(case.facts)} fact(s) via '{bundle.extractor.name}' extractor, {grounded} grounded")
+    case.log("extract", f"{len(case.facts)} fact(s) via '{active_extractor.name}' extractor, {grounded} grounded")
 
     case.rules = bundle.rules.evaluate(case.facts)
     tally = {state: sum(1 for rule in case.rules if rule.status == state) for state in ("PASS", "FAIL", "UNKNOWN")}

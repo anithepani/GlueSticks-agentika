@@ -9,6 +9,7 @@ from pathlib import Path
 from app.adapters import (
     DeterministicVerifier,
     FixtureExtractor,
+    LabelsExtractor,
     PmtRules,
     SqliteAudit,
     TextReader,
@@ -24,7 +25,7 @@ DATA_DIR = Path(os.getenv("WITNESS_DATA_DIR", str(ROOT / "data")))
 CASES_DIR = DATA_DIR / "cases"
 POLICY_DIR = DATA_DIR / "policy"
 
-STAGE = int(os.getenv("WITNESS_STAGE", "2"))
+STAGE = int(os.getenv("WITNESS_STAGE", "3"))
 
 
 @dataclass
@@ -45,12 +46,27 @@ def _reader(name: str) -> Reader:
 def _extractor(name: str) -> Extractor:
     if name == "fixture":
         return FixtureExtractor()
+    if name == "labels":
+        return LabelsExtractor()
     if name == "llm":
         client = build_llm_client()
         if client is None:
             return FixtureExtractor()
         return ResilientExtractor(LLMExtractor(client), FixtureExtractor())
     raise ValueError(f"EXTRACTOR '{name}' is not implemented")
+
+
+def intake_extractor() -> Extractor:
+    """Extractor for cases pasted at runtime (no pre-authored extraction specs).
+
+    Uses the model when a key is configured, but always falls back to the
+    deterministic label reader so an intake case can never be dropped.
+    """
+    client = build_llm_client()
+    labels = LabelsExtractor()
+    if client is None:
+        return labels
+    return ResilientExtractor(LLMExtractor(client), labels)
 
 
 def _verifier(name: str) -> Verifier:

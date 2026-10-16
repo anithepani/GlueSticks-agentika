@@ -73,6 +73,24 @@ See `DEPLOY.md`.
   re-audits each citation and may only add an abstain. No SDKs (stdlib HTTP), and any
   missing key or API failure degrades to the deterministic path, so the live demo
   cannot break.
+- **Stage 3** — runtime intake (`POST /api/cases`): a case pasted as plain text is
+  read by a deterministic label-aware extractor (`app/adapters/extractor_labels.py`,
+  or the model when a key is set), grounded to the matched substrings, and pushed
+  through the same rules/verifier gate. The UI adds a new-case panel, a
+  conflicting-evidence view, a policy view, an evaluation view, and a
+  `request_info → resubmit → re-run` loop. Every artifact that lives under `data/`
+  has an embedded fallback, so the service is fully functional even if a build does
+  not copy `data/` into the image.
+
+## Tests
+
+Pure-Python, no network, no API key required:
+
+```powershell
+.\.venv\Scripts\python.exe tests\test_seed.py
+.\.venv\Scripts\python.exe tests\test_llm.py
+.\.venv\Scripts\python.exe tests\test_intake.py
+```
 
 ## API
 
@@ -82,11 +100,23 @@ See `DEPLOY.md`.
 | GET | `/api/info` | service metadata |
 | GET | `/api/policy` | rule set as Markdown |
 | GET | `/api/cases` | officer queue + stats |
+| POST | `/api/cases` | intake a new case from pasted text and run the pipeline |
 | GET | `/api/cases/{id}` | full case (facts, citations, rules, verification) |
 | POST | `/api/cases/{id}/decision` | human decision `{officer, action, reason}` |
+| POST | `/api/cases/{id}/resubmit` | supply new evidence after `request_info`; re-runs the pipeline |
 | GET | `/api/cases/{id}/audit` | audit entries for a case |
 | GET | `/api/audit/verify` | recompute the hash chain |
+| GET | `/api/eval` | run the evaluation gate over the seeded set |
 | POST | `/api/reseed` | idempotent reseed of seeded cases |
 | GET | `/api/diag` | where cases were loaded from (files vs embedded fallback) |
 | GET | `/api/adapters` | which reader/extractor/verifier/audit are active, and whether an LLM key is set |
+
+## Evaluation gate
+
+`GET /api/eval` re-runs the pipeline over the seeded set and compares it against
+`data/eval/golden.json` (embedded fallback in `app/evaluation.py`). It reports the
+**grounding rate** (facts with a verbatim citation), the **abstain rate** (cases
+escalated instead of guessed), per-case rule agreement, and the hard invariant that
+**no case is ever auto-denied** — the pipeline's highest states before a human are
+`VERIFIED` and `NEEDS_REVIEW`.
 

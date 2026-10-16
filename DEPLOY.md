@@ -61,6 +61,26 @@ acc services rebuild witness
 acc services deploy witness
 ```
 
+## Environment variables for the demo build
+
+Set these in **Settings → Environment Variables**, then **Rebuild → Deploy**:
+
+```
+PORT=8000
+WITNESS_STAGE=3
+READER=text
+EXTRACTOR=llm
+VERIFIER=llm
+LLM_PROVIDER=groq
+GROQ_API_KEY=<paste the key — never commit it>
+GROQ_MODEL=llama-3.3-70b-versatile
+```
+
+`EXTRACTOR=llm`/`VERIFIER=llm` need no key to be safe: with no key — or if the API
+errors or rate-limits mid-demo — Witness falls back to the deterministic
+label/fixture path, so a case is never dropped. Check `GET /api/adapters` to confirm
+what is live, and `GET /api/eval` to confirm the gate still passes.
+
 ---
 
 ## Troubleshooting (from the organizers' guide)

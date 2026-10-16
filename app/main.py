@@ -15,6 +15,8 @@ from pydantic import BaseModel
 
 from app import __version__
 from app.config import CASES_DIR, POLICY_DIR, STAGE, build_adapters, describe_adapters
+from app.evaluation import evaluate
+from app.policy import POLICY_MARKDOWN
 from app.store import CaseStore
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -39,6 +41,23 @@ class DecisionIn(BaseModel):
     reason: str
 
 
+class DocumentIn(BaseModel):
+    doc_id: str | None = None
+    title: str | None = None
+    text: str
+
+
+class IntakeIn(BaseModel):
+    applicant_name: str
+    applicant_cnic: str = ""
+    province: str = ""
+    documents: list[DocumentIn]
+
+
+class ResubmitIn(BaseModel):
+    documents: list[DocumentIn]
+
+
 def _store(request: Request) -> CaseStore:
     return request.app.state.store
 
@@ -61,15 +80,40 @@ def info() -> dict:
 @app.get("/api/policy")
 def policy() -> dict:
     path = POLICY_DIR / "rules.md"
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="policy not found")
-    return {"rules_markdown": path.read_text(encoding="utf-8")}
+    if path.exists():
+        return {"rules_markdown": path.read_text(encoding="utf-8"), "source": "file"}
+    return {"rules_markdown": POLICY_MARKDOWN, "source": "embedded"}
 
 
 @app.get("/api/cases")
 def list_cases(request: Request) -> dict:
     store = _store(request)
     return {"cases": store.summaries(), "stats": store.stats()}
+
+
+@app.post("/api/cases")
+def create_case(payload: IntakeIn, request: Request) -> dict:
+    try:
+        case = _store(request).add_case(payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return case.to_dict()
+
+
+@app.post("/api/cases/{case_id}/resubmit")
+def resubmit(case_id: str, payload: ResubmitIn, request: Request) -> dict:
+    try:
+        case = _store(request).resubmit(case_id, [doc.model_dump() for doc in payload.documents])
+    except KeyError:
+        raise HTTPException(status_code=404, detail="case not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return case.to_dict()
+
+
+@app.get("/api/eval")
+def eval_report(request: Request) -> dict:
+    return evaluate(request.app.state.bundle)
 
 
 @app.get("/api/cases/{case_id}")
