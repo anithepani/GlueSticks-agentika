@@ -204,12 +204,53 @@ def test_tamper_demo_on_empty_ledger():
     print("OK: tamper demo handles an empty ledger without crashing")
 
 
+def test_llm_transport_failure_falls_back_end_to_end():
+    """Scenario 8 at the app level: a failing provider must degrade safely and leak nothing."""
+    import app.main as main
+    from app.adapters import llm_client
+    from fastapi.testclient import TestClient
+
+    os.environ["EXTRACTOR"] = "llm"
+    os.environ["VERIFIER"] = "llm"
+    os.environ["LLM_PROVIDER"] = "groq"
+    os.environ["GROQ_API_KEY"] = "gsk_TESTKEY_LEAKCANARY"
+    original = llm_client.urllib.request.urlopen
+
+    def boom(request, timeout=None):
+        raise RuntimeError(
+            f"connection refused for {request.full_url} Authorization: Bearer gsk_TESTKEY_LEAKCANARY"
+        )
+
+    llm_client.urllib.request.urlopen = boom
+    try:
+        with TestClient(main.app) as client:
+            response = client.post(
+                "/api/cases",
+                json={"applicant_name": "Outage Case", "documents": [{"title": "Form", "text": FORM}]},
+            )
+            assert response.status_code == 200, response.text
+            body = response.json()
+            assert body["status"] == "VERIFIED", (body["status"], body["verification"]["reasons"])
+            assert any(f["method"].endswith("(fallback)") for f in body["facts"]), body["facts"]
+            assert "gsk_TESTKEY_LEAKCANARY" not in response.text, "key leaked into the response"
+            adapters = client.get("/api/adapters").json()
+            assert adapters["llm_configured"] is True, adapters
+            assert "fallback" in adapters["extractor"], adapters
+    finally:
+        llm_client.urllib.request.urlopen = original
+        os.environ.pop("GROQ_API_KEY", None)
+        os.environ["EXTRACTOR"] = "fixture"
+        os.environ["VERIFIER"] = "det"
+    print("OK: provider outage degrades to the deterministic path with no key leakage")
+
+
 def main() -> int:
     test_concurrent_decision_is_serialized()
     test_intake_id_does_not_collide_after_reseed()
     test_llm_key_never_leaks()
     test_decision_override_is_recorded()
     test_api_error_and_status_paths()
+    test_llm_transport_failure_falls_back_end_to_end()
     test_tamper_demo_on_empty_ledger()
     print("ALL REGRESSION TESTS PASSED")
     return 0

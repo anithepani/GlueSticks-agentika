@@ -424,3 +424,27 @@ interactive login and hang. The two prior `CVM failed` attempts are documented; 
 attempt was made with an unchanged configuration. Requirements for a retry and the
 attestation command are recorded in `DEPLOY.md`. No TEE claim is made.
 
+### Production status at end of session 2 ΓÇö DOWN (lease gone)
+
+Live verification succeeded partially, then the platform reported:
+
+```
+404 (flapping)  ->  503  ->  {"error":"Service Unavailable",
+                             "message":"This service exists but has no active deployment."}
+```
+
+A random subdomain still returns `{"error":"Not Found","message":"No service found for this
+app subdomain."}`, so **the Alternate Clouds edge is healthy and the service record exists ΓÇö
+there is simply no running deployment (lease) behind it.** This is the same class of failure
+as the earlier provider-ingress incident (which was fixed by a fresh deploy), now escalated
+to a lost lease.
+
+Restoring it requires `acc login --email` (or the dashboard **Rebuild -> Deploy**). The agent
+has no credential in this workspace (`AF_TOKEN` unset, no `acc` config dir), so it cannot
+recover production itself. The committed code is `014406f`; the last image deployed was
+`e7904e2c1cae` (v0.4.0).
+
+Additional production observation: Cloudflare returns `403 error code: 1010` to clients that
+present a non-browser `User-Agent`; verification scripts must send a normal UA header.
+
+

@@ -65,6 +65,14 @@ acc services deploy witness
 | | |
 |---|---|
 | Project | `witness-agentika` |
+| Last known good | `v0.4.0`, image `e7904e2c1cae` |
+
+> **Status at last check: no active deployment.** The URL returned
+> `503 {"error":"Service Unavailable","message":"This service exists but has no active deployment."}`
+> directly from Alternate Clouds (the platform edge itself is healthy: a random subdomain
+> still returns the `No service found` JSON). The application is fine; the lease just needs
+> recreating with the Rebuild -> Deploy steps above, which requires an authenticated `acc`
+> session.
 | Service | `alternate-echo-whale-5578-github` (`cmvbc3e5706exe41rs9g87kmn`) |
 | URL | https://alternate-echo-whale-5578-github-app.alternatefutures.ai |
 | Port | `8000` (the k8s Service in front is on `80` → `8000`; app must listen on `8000`) |
@@ -209,5 +217,7 @@ or remote attestation.** The application never depends on confidential compute.
 | Live URL returns nginx **404 Not Found** while logs show the app started | The **provider ingress** is stale/misconfigured. The app is fine (verify inside the container with `acc ssh <id> --command "python -c print(__import__('urllib.request').request.urlopen('http://127.0.0.1:8000/health').read())"`). Fix: **force a fresh deployment** — `acc services deploy <id> -y` (new lease/provider), or the dashboard **Redeploy**. Editing Ports does *not* fix this. |
 | Live URL returns nginx **404 Not Found** and Settings → Ports is empty | The container port was never exposed. Add `8000` / `http` (Public blank), Save, Redeploy. |
 | Pushed but live app unchanged | Building and deploying are separate. **Rebuild**, then **Deploy**. |
+| `503` with `{"error":"Service Unavailable","message":"This service exists but has no active deployment."}` | The lease is gone (provider died / lease closed / auto-stop). The service and URL still exist but nothing is running. **Recover:** `acc login --email` then `acc services -p witness-agentika rebuild cmvbc3e5706exe41rs9g87kmn` ΓåÆ `acc services -p witness-agentika deploy cmvbc3e5706exe41rs9g87kmn -y`; or the dashboard **Rebuild ΓåÆ Deploy**. Requiring a login is why this cannot be done by a non-interactive agent. |
+| Live URL flips between `200`, nginx `404`, and `503` | Provider-ingress instability. Confirm the platform edge itself is healthy by probing a random subdomain (it returns `{"error":"Not Found",...}` when the edge works). Fix with a fresh deploy onto a new lease/provider. |
 | Build succeeds, app crashes with `KeyError` | A required env var is missing. Add it under **Variables**, Rebuild, Deploy. |
 | Anything else | Read the **Logs** tab first; then post logs (as text, keys removed) in the AF Discord `#support`. |
