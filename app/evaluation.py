@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 from app.config import POLICY_DIR, AdapterBundle
+from app.adapters import DeterministicVerifier, FixtureExtractor
 from app.embedded import DEFAULT_GOLDEN
 from app.models import STATUS_DENIED
 from app.pipeline import run_pipeline
@@ -19,6 +20,22 @@ from app.seed_cases import load_packets
 GOLDEN_PATH = POLICY_DIR.parent / "eval" / "golden.json"
 
 PRE_HUMAN_STATUSES = ("INTAKE", "VERIFIED", "NEEDS_REVIEW")
+
+
+def deterministic_view(bundle: AdapterBundle) -> AdapterBundle:
+    """The reproducible slice of the pipeline that the gate scores.
+
+    Extraction/verification are pinned to the deterministic adapters so the gate
+    is stable regardless of whether an LLM key is configured or the model drifts.
+    The reader, rules and audit are reused as-is.
+    """
+    return AdapterBundle(
+        reader=bundle.reader,
+        extractor=FixtureExtractor(),
+        rules=bundle.rules,
+        verifier=DeterministicVerifier(),
+        audit=bundle.audit,
+    )
 
 
 def _load_golden() -> dict[str, dict]:
@@ -32,6 +49,7 @@ def _load_golden() -> dict[str, dict]:
 def evaluate(bundle: AdapterBundle) -> dict:
     packets, source, _ = load_packets()
     expected = _load_golden()
+    gate_bundle = deterministic_view(bundle)
     details: list[dict] = []
     grounded_total = 0
     facts_total = 0
@@ -41,7 +59,7 @@ def evaluate(bundle: AdapterBundle) -> dict:
     no_auto_deny = True
 
     for packet in packets:
-        case = run_pipeline(packet, bundle)
+        case = run_pipeline(packet, gate_bundle)
         rules = {rule.rule_id: rule.status for rule in case.rules}
         grounded = sum(1 for fact in case.facts if fact.citation is not None)
         grounded_total += grounded
@@ -85,6 +103,7 @@ def evaluate(bundle: AdapterBundle) -> dict:
     return {
         "seed_source": source,
         "cases": len(packets),
+        "scored_path": {"extractor": "fixture", "verifier": "det"},
         "metrics": {
             "grounding_rate": round(grounded_total / facts_total, 3) if facts_total else 0.0,
             "abstain_rate": round(abstains / len(packets), 3) if packets else 0.0,

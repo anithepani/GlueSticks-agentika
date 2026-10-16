@@ -37,6 +37,31 @@ def test_eval_gate_passes():
     print("OK: eval gate passes and no_auto_deny holds")
 
 
+def test_gate_is_independent_of_live_llm_adapters():
+    """The gate must stay green even if the runtime extractor/verifier are LLM-backed."""
+    from app.adapters import DeterministicVerifier
+    from app.config import AdapterBundle
+
+    class ExplodingExtractor:
+        name = "llm(boom)"
+
+        def extract(self, documents, packet):
+            raise RuntimeError("model unavailable")
+
+    _, bundle = fresh_store()
+    swapped = AdapterBundle(
+        reader=bundle.reader,
+        extractor=ExplodingExtractor(),
+        rules=bundle.rules,
+        verifier=DeterministicVerifier(),
+        audit=bundle.audit,
+    )
+    report = evaluate(swapped)
+    assert report["all_passed"] is True, report["metrics"]
+    assert report["scored_path"] == {"extractor": "fixture", "verifier": "det"}, report["scored_path"]
+    print("OK: gate scores the deterministic path, immune to LLM drift/outage")
+
+
 def test_verify_entries_detects_forged_chain():
     entries = [
         {"seq": 1, "ts": "t1", "case_id": "c", "event": "e", "actor": "a", "payload": {"v": 1}, "prev_hash": "0" * 64, "hash": ""},
@@ -90,6 +115,7 @@ def test_strict_mode_refuses_when_gate_fails(monkeypatch_target=None):
 
 def main() -> int:
     test_eval_gate_passes()
+    test_gate_is_independent_of_live_llm_adapters()
     test_verify_entries_detects_forged_chain()
     test_tamper_demo_never_touches_real_ledger()
     test_strict_mode_refuses_when_gate_fails()
