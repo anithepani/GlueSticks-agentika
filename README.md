@@ -28,9 +28,17 @@ port behind an environment flag, so components can be upgraded without a rewrite
 | Flag | Values | Meaning |
 |---|---|---|
 | `READER` | `text` (later: `pdf`) | document reader |
-| `EXTRACTOR` | `fixture` (later: `llm`) | fact extraction |
-| `VERIFIER` | `det` (later: `llm`) | abstain / audit |
+| `EXTRACTOR` | `fixture`, `llm` | fact extraction |
+| `VERIFIER` | `det`, `llm` | abstain / audit |
 | `AUDIT` | `sqlite` (later: `postgres`) | audit storage |
+| `LLM_PROVIDER` | `groq`, `gemini` | which free provider the LLM adapters use |
+
+`EXTRACTOR=llm` asks a model for a value **plus the exact quote**; Witness then grounds
+that quote verbatim, so an invented quote yields no citation and the verifier abstains.
+`VERIFIER=llm` re-reads each citation and may only make the verdict **more** cautious —
+it can add an abstain but never clears a deterministic failure. If a key is missing or a
+call fails, both fall back to the deterministic path so a case is never dropped.
+`GET /api/adapters` reports which adapters are live.
 
 The app reads `PORT` from the environment, so the Alternate Clouds Source-tab port
 always matches what the app listens on.
@@ -60,6 +68,11 @@ See `DEPLOY.md`.
   integrity check. Cases load from `data/cases/*.json` with an embedded fallback
   (`app/seed_cases.py`) so the service is never empty; `/api/diag` reports which
   source was used.
+- **Stage 2** — optional LLM adapters: `EXTRACTOR=llm` (Groq or Gemini) proposes
+  values **with the exact quote**, which Witness grounds verbatim; `VERIFIER=llm`
+  re-audits each citation and may only add an abstain. No SDKs (stdlib HTTP), and any
+  missing key or API failure degrades to the deterministic path, so the live demo
+  cannot break.
 
 ## API
 
@@ -75,4 +88,5 @@ See `DEPLOY.md`.
 | GET | `/api/audit/verify` | recompute the hash chain |
 | POST | `/api/reseed` | idempotent reseed of seeded cases |
 | GET | `/api/diag` | where cases were loaded from (files vs embedded fallback) |
+| GET | `/api/adapters` | which reader/extractor/verifier/audit are active, and whether an LLM key is set |
 

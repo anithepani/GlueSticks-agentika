@@ -152,8 +152,9 @@ function render(){
     const cit = f.citation;
     const grounded = cit && cit.grounded;
     const quote = cit ? `“${esc(cit.quote)}” <span class="muted">(${esc(cit.doc_id)} ${cit.start}–${cit.end})</span>` : '<span class="bad">no citation</span>';
+    const method = f.method ? `<span class="muted" style="font-size:11px">${esc(f.method)}</span>` : '';
     return `<tr>
-      <td>${esc(f.label || f.key)}</td>
+      <td>${esc(f.label || f.key)} ${method}</td>
       <td><code>${esc(JSON.stringify(f.value))}</code></td>
       <td class="quote">${quote} ${grounded ? '<span class="ok">✓ verified</span>' : '<span class="bad">✗ unverified</span>'}</td>
     </tr>`;

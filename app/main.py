@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from app import __version__
-from app.config import CASES_DIR, POLICY_DIR, STAGE, build_adapters
+from app.config import CASES_DIR, POLICY_DIR, STAGE, build_adapters, describe_adapters
 from app.store import CaseStore
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -116,6 +116,11 @@ def stats(request: Request) -> dict:
 @app.get("/api/diag")
 def diag(request: Request) -> dict:
     return _store(request).diag()
+
+
+@app.get("/api/adapters")
+def adapters(request: Request) -> dict:
+    return describe_adapters(request.app.state.bundle)
 
 
 @app.get("/")
