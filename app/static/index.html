@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Witness — Human-in-the-Loop Decision Desk</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121821; --panel-2:#0f151d; --line:#1f2a37;
+    --txt:#e6edf3; --muted:#8b98a5; --accent:#5b8cff; --ok:#2ecc71; --warn:#f2c14e; --bad:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#15233d 0%,var(--bg) 55%);color:var(--txt);
+       font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1040px;margin:0 auto;padding:48px 24px 64px;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.2px}
+  .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),#7b5bff);
+        display:grid;place-items:center;font-weight:800;color:#fff}
+  .status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);
+          border:1px solid var(--line);padding:7px 12px;border-radius:999px;background:var(--panel-2)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);box-shadow:0 0 0 0 rgba(0,0,0,0)}
+  .dot.ok{background:var(--ok);animation:pulse 2s infinite}
+  .dot.bad{background:var(--bad)}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(46,204,113,.5)}70%{box-shadow:0 0 0 8px rgba(46,204,113,0)}100%{box-shadow:0 0 0 0 rgba(46,204,113,0)}}
+  h1{font-size:clamp(30px,5vw,50px);line-height:1.05;margin:42px 0 12px;letter-spacing:-.02em}
+  .sub{color:var(--muted);font-size:18px;max-width:620px;margin:0 0 34px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);
+        border-radius:14px;padding:18px}
+  .card h3{margin:0 0 8px;font-size:14px;letter-spacing:.02em}
+  .card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+  .tag{display:inline-block;font-size:11px;color:#bcd0ff;background:#16233a;border:1px solid #24365a;
+       padding:3px 8px;border-radius:999px;margin-bottom:10px}
+  footer{margin-top:44px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:18px}
+  code{background:#0c1219;border:1px solid var(--line);padding:2px 6px;border-radius:6px;font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><div class="logo">W</div><span>Witness</span></div>
+    <div class="status"><span id="dot" class="dot"></span><span id="stat">checking API…</span></div>
+  </header>
+
+  <h1>AI proposes.<br/>An independent check audits.<br/>A human decides.</h1>
+  <p class="sub">
+    A human-in-the-loop decision desk for high-stakes eligibility. The AI extracts evidence with
+    citations, a deterministic rules engine checks eligibility, a verifier <strong>abstains</strong>
+    when evidence is missing or contradictory, and an officer makes the final call — recorded in a
+    tamper-evident log. Nothing is ever auto-denied.
+  </p>
+
+  <div class="grid">
+    <div class="card">
+      <span class="tag">Grounding</span>
+      <h3>Evidence with citations</h3>
+      <p>Every claimed fact is tied back to a verbatim span in a source document and re-checked deterministically.</p>
+    </div>
+    <div class="card">
+      <span class="tag">Deterministic</span>
+      <h3>Rules in plain code</h3>
+      <p>Eligibility rules run as ordinary code and return PASS / FAIL / UNKNOWN. The model never decides the rule.</p>
+    </div>
+    <div class="card">
+      <span class="tag">Abstention</span>
+      <h3>The verifier can refuse</h3>
+      <p>Missing fields, contradictions, or unfound citations force an abstain — the case is escalated to a person.</p>
+    </div>
+    <div class="card">
+      <span class="tag">Accountability</span>
+      <h3>Auditable by design</h3>
+      <p>Each human decision is hash-chained into an append-only ledger with a one-click integrity check.</p>
+    </div>
+  </div>
+
+  <footer>
+    Stage <span id="stage">0</span> · skeleton deployed on Alternate Clouds ·
+    API: <code>/health</code>, <code>/api/info</code>
+  </footer>
+</div>
+
+<script>
+  async function poll(){
+    const dot = document.getElementById('dot');
+    const stat = document.getElementById('stat');
+    try{
+      const r = await fetch('/health', {cache:'no-store'});
+      const j = await r.json();
+      if(j.status === 'ok'){
+        dot.className = 'dot ok';
+        stat.textContent = 'API online · v' + j.version;
+        document.getElementById('stage').textContent = j.stage;
+      }else{ throw new Error('bad'); }
+    }catch(e){
+      dot.className = 'dot bad';
+      stat.textContent = 'API unreachable';
+    }
+  }
+  poll();
+  setInterval(poll, 5000);
+</script>
+</body>
+</html>
