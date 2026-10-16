@@ -44,7 +44,6 @@ git push origin main
     `{"status":"ok", ...}`.
 
 ## 3. CLI alternative
-
 ```powershell
 npm install -g @alternatefutures/acc
 acc login --email
@@ -61,8 +60,31 @@ acc services rebuild witness
 acc services deploy witness
 ```
 
-## Environment variables for the demo build
+### Live service (current)
 
+| | |
+|---|---|
+| Project | `witness-agentika` |
+| Service | `alternate-echo-whale-5578-github` (`cmvbc3e5706exe41rs9g87kmn`) |
+| URL | https://alternate-echo-whale-5578-github-app.alternatefutures.ai |
+| Port | `8000` (the k8s Service in front is on `80` → `8000`; app must listen on `8000`) |
+
+Working cheat sheet (no global install needed — `npx` works):
+
+```powershell
+npx -y @alternatefutures/acc services -p witness-agentika list
+npx -y @alternatefutures/acc services -p witness-agentika info cmvbc3e5706exe41rs9g87kmn
+npx -y @alternatefutures/acc services -p witness-agentika logs cmvbc3e5706exe41rs9g87kmn --tail 100
+npx -y @alternatefutures/acc services -p witness-agentika rebuild cmvbc3e5706exe41rs9g87kmn
+npx -y @alternatefutures/acc services -p witness-agentika deploy  cmvbc3e5706exe41rs9g87kmn -y
+npx -y @alternatefutures/acc ssh cmvbc3e5706exe41rs9g87kmn --command "whoami"
+```
+
+`acc ssh --command` execs argv directly (no shell), so use single commands
+(`cat /proc/net/tcp`) or space-free Python
+(`python -c print(__import__('urllib.request').request.urlopen('http://127.0.0.1:8000/health').read())`).
+
+## Environment variables for the demo build
 Set these in **Settings → Environment Variables**, then **Rebuild → Deploy**:
 
 ```
@@ -88,7 +110,8 @@ what is live, and `GET /api/eval` to confirm the gate still passes.
 | Symptom | Fix |
 |---|---|
 | Cloudflare **502 Bad Gateway** | Port mismatch. Ensure the app listens on `8000` and the Source tab port is `8000`. |
-| Live URL returns nginx **404 Not Found** while logs show `Uvicorn running on 0.0.0.0:8000` | The gateway found the service but nothing is exposed. **Settings → Ports → Add Port**: container port `8000`, protocol `http`, Public blank → **Save** → **Redeploy**. |
+| Live URL returns nginx **404 Not Found** while logs show the app started | The **provider ingress** is stale/misconfigured. The app is fine (verify inside the container with `acc ssh <id> --command "python -c print(__import__('urllib.request').request.urlopen('http://127.0.0.1:8000/health').read())"`). Fix: **force a fresh deployment** — `acc services deploy <id> -y` (new lease/provider), or the dashboard **Redeploy**. Editing Ports does *not* fix this. |
+| Live URL returns nginx **404 Not Found** and Settings → Ports is empty | The container port was never exposed. Add `8000` / `http` (Public blank), Save, Redeploy. |
 | Pushed but live app unchanged | Building and deploying are separate. **Rebuild**, then **Deploy**. |
 | Build succeeds, app crashes with `KeyError` | A required env var is missing. Add it under **Variables**, Rebuild, Deploy. |
 | Anything else | Read the **Logs** tab first; then post logs (as text, keys removed) in the AF Discord `#support`. |
