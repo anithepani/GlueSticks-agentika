@@ -54,3 +54,22 @@ See `DEPLOY.md`.
 ## Stage log
 
 - **Stage 0** — skeleton, `/health`, static landing page. Deployed and reachable.
+- **Stage 1** — walking skeleton: 5 seeded synthetic cases, deterministic rules,
+  independent verifier that can abstain, human decision gate (approve/deny/request
+  info with a required reason), and a hash-chained SQLite audit ledger with an
+  integrity check.
+
+## API
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/health` | liveness + stage |
+| GET | `/api/info` | service metadata |
+| GET | `/api/policy` | rule set as Markdown |
+| GET | `/api/cases` | officer queue + stats |
+| GET | `/api/cases/{id}` | full case (facts, citations, rules, verification) |
+| POST | `/api/cases/{id}/decision` | human decision `{officer, action, reason}` |
+| GET | `/api/cases/{id}/audit` | audit entries for a case |
+| GET | `/api/audit/verify` | recompute the hash chain |
+| POST | `/api/reseed` | idempotent reseed of seeded cases |
+

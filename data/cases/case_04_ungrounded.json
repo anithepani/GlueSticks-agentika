@@ -1,0 +1,20 @@
+{
+  "id": "CASE-2026-0004",
+  "applicant_name": "Imran Shah",
+  "applicant_cnic": "17301-2222222-3",
+  "province": "Khyber Pakhtunkhwa",
+  "documents": [
+    {
+      "doc_id": "d1",
+      "title": "Form B-1 — Income Support Application",
+      "text": "Form B-1: Income Support Application\nName: Imran Shah\nCNIC: 17301-2222222-3\nAge: 52 years\nProvince of residence: Khyber Pakhtunkhwa\nHousehold size: 6 persons\nOwns a car: No\nNote: income section left blank at intake."
+    }
+  ],
+  "extraction": [
+    { "key": "age", "label": "Age", "quote": "Age: 52 years", "value": 52, "doc_id": "d1" },
+    { "key": "province", "label": "Province", "quote": "Province of residence: Khyber Pakhtunkhwa", "value": "Khyber Pakhtunkhwa", "doc_id": "d1" },
+    { "key": "household_size", "label": "Household size", "quote": "Household size: 6 persons", "value": 6, "doc_id": "d1" },
+    { "key": "monthly_income_pkr", "label": "Monthly income (PKR)", "quote": "Monthly household income: PKR 30,000", "value": 30000, "doc_id": "d1" },
+    { "key": "owns_car", "label": "Owns a car", "quote": "Owns a car: No", "value": false, "doc_id": "d1" }
+  ]
+}

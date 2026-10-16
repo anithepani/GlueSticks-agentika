@@ -1,0 +1,20 @@
+{
+  "id": "CASE-2026-0005",
+  "applicant_name": "Sana Malik",
+  "applicant_cnic": "33100-3333333-4",
+  "province": "Punjab",
+  "documents": [
+    {
+      "doc_id": "d1",
+      "title": "Form B-1 — Income Support Application",
+      "text": "Form B-1: Income Support Application\nName: Sana Malik\nCNIC: 33100-3333333-4\nAge: 38 years\nProvince of residence: Punjab\nHousehold size: 4 persons\nMonthly household income: PKR 120,000\nOwns a car: Yes\nDeclaration: I declare the above is true and complete."
+    }
+  ],
+  "extraction": [
+    { "key": "age", "label": "Age", "quote": "Age: 38 years", "value": 38, "doc_id": "d1" },
+    { "key": "province", "label": "Province", "quote": "Province of residence: Punjab", "value": "Punjab", "doc_id": "d1" },
+    { "key": "household_size", "label": "Household size", "quote": "Household size: 4 persons", "value": 4, "doc_id": "d1" },
+    { "key": "monthly_income_pkr", "label": "Monthly income (PKR)", "quote": "Monthly household income: PKR 120,000", "value": 120000, "doc_id": "d1" },
+    { "key": "owns_car", "label": "Owns a car", "quote": "Owns a car: Yes", "value": true, "doc_id": "d1" }
+  ]
+}

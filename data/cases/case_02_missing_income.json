@@ -1,0 +1,19 @@
+{
+  "id": "CASE-2026-0002",
+  "applicant_name": "Bilal Khan",
+  "applicant_cnic": "42101-7654321-9",
+  "province": "Sindh",
+  "documents": [
+    {
+      "doc_id": "d1",
+      "title": "Form B-1 — Income Support Application",
+      "text": "Form B-1: Income Support Application\nName: Bilal Khan\nCNIC: 42101-7654321-9\nAge: 41 years\nProvince of residence: Sindh\nHousehold size: 7 persons\nOwns a car: No\nDeclaration: I declare the above is true and complete."
+    }
+  ],
+  "extraction": [
+    { "key": "age", "label": "Age", "quote": "Age: 41 years", "value": 41, "doc_id": "d1" },
+    { "key": "province", "label": "Province", "quote": "Province of residence: Sindh", "value": "Sindh", "doc_id": "d1" },
+    { "key": "household_size", "label": "Household size", "quote": "Household size: 7 persons", "value": 7, "doc_id": "d1" },
+    { "key": "owns_car", "label": "Owns a car", "quote": "Owns a car: No", "value": false, "doc_id": "d1" }
+  ]
+}

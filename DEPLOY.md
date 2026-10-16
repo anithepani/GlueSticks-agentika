@@ -3,6 +3,13 @@
 Alternate Clouds routes to **one port**. The app reads `PORT` (default `8000`) and the
 Dockerfile `EXPOSE`s `8000`, so the dashboard port must be **8000**.
 
+Two places carry the port and **both** matter:
+
+1. **Source** tab — the framework port (Nixpacks detected `8000`).
+2. **Settings → Ports** — the *container port to expose*. This must list `8000`
+   (protocol `http`, Public left blank). **If this list is empty the public URL
+   returns an nginx `404 Not Found` even though the app is running and healthy.**
+
 Golden rule: **set variables → Rebuild → Deploy**. Pushing to GitHub does *not* update the
 live app on its own.
 
@@ -61,6 +68,7 @@ acc services deploy witness
 | Symptom | Fix |
 |---|---|
 | Cloudflare **502 Bad Gateway** | Port mismatch. Ensure the app listens on `8000` and the Source tab port is `8000`. |
+| Live URL returns nginx **404 Not Found** while logs show `Uvicorn running on 0.0.0.0:8000` | The gateway found the service but nothing is exposed. **Settings → Ports → Add Port**: container port `8000`, protocol `http`, Public blank → **Save** → **Redeploy**. |
 | Pushed but live app unchanged | Building and deploying are separate. **Rebuild**, then **Deploy**. |
 | Build succeeds, app crashes with `KeyError` | A required env var is missing. Add it under **Variables**, Rebuild, Deploy. |
 | Anything else | Read the **Logs** tab first; then post logs (as text, keys removed) in the AF Discord `#support`. |

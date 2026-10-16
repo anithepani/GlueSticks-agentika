@@ -1,0 +1,26 @@
+{
+  "id": "CASE-2026-0003",
+  "applicant_name": "Nadia Rehman",
+  "applicant_cnic": "35202-1111111-2",
+  "province": "Punjab",
+  "documents": [
+    {
+      "doc_id": "d1",
+      "title": "Form B-1 — Income Support Application",
+      "text": "Form B-1: Income Support Application\nName: Nadia Rehman\nCNIC: 35202-1111111-2\nAge: 29 years\nProvince of residence: Punjab\nHousehold size: 3 persons\nMonthly household income: PKR 45,000\nOwns a car: No"
+    },
+    {
+      "doc_id": "d2",
+      "title": "Income Verification Note",
+      "text": "Income Verification Note\nApplicant: Nadia Rehman\nMonthly household income (revised): PKR 90,000\nSource: employer certificate received after initial intake."
+    }
+  ],
+  "extraction": [
+    { "key": "age", "label": "Age", "quote": "Age: 29 years", "value": 29, "doc_id": "d1" },
+    { "key": "province", "label": "Province", "quote": "Province of residence: Punjab", "value": "Punjab", "doc_id": "d1" },
+    { "key": "household_size", "label": "Household size", "quote": "Household size: 3 persons", "value": 3, "doc_id": "d1" },
+    { "key": "monthly_income_pkr", "label": "Monthly income (PKR)", "quote": "Monthly household income: PKR 45,000", "value": 45000, "doc_id": "d1" },
+    { "key": "monthly_income_pkr", "label": "Monthly income (PKR)", "quote": "Monthly household income (revised): PKR 90,000", "value": 90000, "doc_id": "d2" },
+    { "key": "owns_car", "label": "Owns a car", "quote": "Owns a car: No", "value": false, "doc_id": "d1" }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "id": "CASE-2026-0001",
+  "applicant_name": "Ayesha Bibi",
+  "applicant_cnic": "61101-1234567-8",
+  "province": "Punjab",
+  "documents": [
+    {
+      "doc_id": "d1",
+      "title": "Form B-1 — Income Support Application",
+      "text": "Form B-1: Income Support Application\nName: Ayesha Bibi\nCNIC: 61101-1234567-8\nAge: 34 years\nProvince of residence: Punjab\nHousehold size: 5 persons\nMonthly household income: PKR 45,000\nOwns a car: No\nDeclaration: I declare the above is true and complete."
+    }
+  ],
+  "extraction": [
+    { "key": "age", "label": "Age", "quote": "Age: 34 years", "value": 34, "doc_id": "d1" },
+    { "key": "province", "label": "Province", "quote": "Province of residence: Punjab", "value": "Punjab", "doc_id": "d1" },
+    { "key": "household_size", "label": "Household size", "quote": "Household size: 5 persons", "value": 5, "doc_id": "d1" },
+    { "key": "monthly_income_pkr", "label": "Monthly income (PKR)", "quote": "Monthly household income: PKR 45,000", "value": 45000, "doc_id": "d1" },
+    { "key": "owns_car", "label": "Owns a car", "quote": "Owns a car: No", "value": false, "doc_id": "d1" }
+  ]
+}
