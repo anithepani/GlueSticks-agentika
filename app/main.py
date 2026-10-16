@@ -113,6 +113,11 @@ def stats(request: Request) -> dict:
     return _store(request).stats()
 
 
+@app.get("/api/diag")
+def diag(request: Request) -> dict:
+    return _store(request).diag()
+
+
 @app.get("/")
 def index():
     page = STATIC_DIR / "index.html"

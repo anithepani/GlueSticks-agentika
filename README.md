@@ -57,7 +57,9 @@ See `DEPLOY.md`.
 - **Stage 1** — walking skeleton: 5 seeded synthetic cases, deterministic rules,
   independent verifier that can abstain, human decision gate (approve/deny/request
   info with a required reason), and a hash-chained SQLite audit ledger with an
-  integrity check.
+  integrity check. Cases load from `data/cases/*.json` with an embedded fallback
+  (`app/seed_cases.py`) so the service is never empty; `/api/diag` reports which
+  source was used.
 
 ## API
 
@@ -72,4 +74,5 @@ See `DEPLOY.md`.
 | GET | `/api/cases/{id}/audit` | audit entries for a case |
 | GET | `/api/audit/verify` | recompute the hash chain |
 | POST | `/api/reseed` | idempotent reseed of seeded cases |
+| GET | `/api/diag` | where cases were loaded from (files vs embedded fallback) |
 

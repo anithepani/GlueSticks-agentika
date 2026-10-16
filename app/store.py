@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from app.config import AdapterBundle
@@ -16,6 +15,7 @@ from app.models import (
     Case,
 )
 from app.pipeline import run_pipeline
+from app.seed_cases import load_packets
 
 
 class CaseStore:
@@ -23,11 +23,15 @@ class CaseStore:
         self._bundle = bundle
         self._dir = Path(cases_dir)
         self._cases: dict[str, Case] = {}
+        self._source = "unseeded"
+        self._diagnostics: dict = {}
 
     def seed(self) -> int:
+        packets, source, diagnostics = load_packets(self._dir)
+        self._source = source
+        self._diagnostics = diagnostics
         created = 0
-        for path in sorted(self._dir.glob("*.json")):
-            packet = json.loads(path.read_text(encoding="utf-8"))
+        for packet in packets:
             case_id = str(packet["id"])
             if case_id in self._cases:
                 continue
@@ -36,6 +40,9 @@ class CaseStore:
             self._record_pipeline(case)
             created += 1
         return created
+
+    def diag(self) -> dict:
+        return {"seed_source": self._source, "cases_loaded": len(self._cases), **self._diagnostics}
 
     def reseed(self) -> int:
         self._cases.clear()
