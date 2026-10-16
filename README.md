@@ -108,10 +108,35 @@ Pure-Python, no network, no API key required:
 .\.venv\Scripts\python.exe tests\test_gate.py
 .\.venv\Scripts\python.exe tests\test_pdf.py
 .\.venv\Scripts\python.exe tests\test_ops.py
+.\.venv\Scripts\python.exe tests\test_regressions.py
 ```
 
 `tools/embed.py` regenerates `app/embedded.py` from `data/`; `tests/test_seed.py`
-fails if it is stale.
+fails if it is stale. `tests/test_regressions.py` covers concurrency (only one human
+decision can win), intake-id uniqueness across reseeds, provider-key redaction,
+abstention-override recording, invalid-transition rejection and the tamper demo.
+
+## Persistence
+
+The seeded cases and decisions are held in memory; the audit ledger is stored by the
+`AUDIT` backend. These have **different durability**:
+
+- **SQLite (default):** survives a *process restart* on the same filesystem, and the
+  chain verifies unchanged. It does **not** survive a *redeploy* (the container
+  filesystem is ephemeral; no persistent volume is mounted).
+- **Postgres:** would survive redeploys, but the linked database in the current
+  deployment is on a different provider/cluster and is unreachable, so the app runs
+  the SQLite fallback and reports `audit_degraded: true`.
+
+A verifying hash chain proves **integrity**, not durability. See `DEPLOY.md` for the
+verified persistence table.
+
+## Docker image
+
+`Dockerfile` installs `requirements.txt` and copies both `app/` and `data/`, so the
+seeded cases, golden expectations and policy ship in the image. Every `data/` artifact
+still has an embedded fallback (`app/embedded.py`), so the service also runs if only
+`app/` is present. `GET /api/diag` reports which source was used.
 
 ## API
 

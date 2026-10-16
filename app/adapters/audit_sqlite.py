@@ -63,12 +63,20 @@ class SqliteAudit:
         self._init()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.path)
+        conn = sqlite3.connect(self.path, timeout=30.0)
         conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("PRAGMA busy_timeout = 30000")
+        except sqlite3.Error:
+            pass
         return conn
 
     def _init(self) -> None:
         with self._lock, self._connect() as conn:
+            try:
+                conn.execute("PRAGMA journal_mode = WAL")
+            except sqlite3.Error:
+                pass
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS entries (
@@ -130,5 +138,12 @@ class SqliteAudit:
             ).fetchone()
         return row is not None
 
+    def case_ids(self) -> set[str]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT DISTINCT case_id FROM entries WHERE case_id IS NOT NULL").fetchall()
+        return {row[0] for row in rows}
+
     def verify(self) -> dict:
-        return verify_entries(self.entries())
+        result = verify_entries(self.entries())
+        result["ledger"] = self.name
+        return result

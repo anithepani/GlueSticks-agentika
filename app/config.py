@@ -111,7 +111,17 @@ def describe_adapters(bundle: AdapterBundle) -> dict:
     client = build_llm_client()
     requested = os.getenv("AUDIT", "sqlite")
     active = bundle.audit.name
-    degraded = requested != "sqlite" and not active.startswith(requested)
+    runtime_degraded = bool(getattr(bundle.audit, "degraded", False))
+    # Degraded if the requested backend is not the one serving, or if a resilient
+    # wrapper has already fallen back at runtime (reachable at start, failed since).
+    requested_serving = active == requested or active.startswith(f"{requested}(")
+    degraded = (requested != "sqlite" and not requested_serving) or runtime_degraded
+    if runtime_degraded:
+        note = f"requested '{requested}', fell back to '{active}' at runtime after a failure"
+    elif requested != "sqlite" and not requested_serving:
+        note = f"requested '{requested}' but running '{active}' (backend unreachable)"
+    else:
+        note = "as requested"
     return {
         "reader": bundle.reader.name,
         "extractor": bundle.extractor.name,
@@ -121,11 +131,8 @@ def describe_adapters(bundle: AdapterBundle) -> dict:
         "audit_requested": requested,
         "audit_active": active,
         "audit_degraded": degraded,
-        "audit_note": (
-            f"requested '{requested}' but running '{active}' (linked host unreachable from this provider)"
-            if degraded
-            else "as requested"
-        ),
+        "audit_runtime_degraded": runtime_degraded,
+        "audit_note": note,
         "llm_provider": os.getenv("LLM_PROVIDER", "groq"),
         "llm_configured": client is not None,
         "llm_model": client.model if client else None,

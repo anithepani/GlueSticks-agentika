@@ -345,6 +345,10 @@ async function tamper(){
   $('chain').innerHTML = '<span class="muted">tampering with a copy…</span>';
   try{
     const r = await api('/api/audit/tamper-demo', {method:'POST'});
+    if(!r.tampered){
+      $('chain').innerHTML = `<span class="muted">ledger empty — nothing to tamper</span> (${r.intact.checked} entries)`;
+      return;
+    }
     $('chain').innerHTML =
       `<span class="ok">✓ chain intact</span> (${r.intact.checked} entries)<br/>` +
       `<span class="bad">✗ forged copy detected at #${r.tampered.broken_at}</span><br/>` +

@@ -71,6 +71,11 @@ acc services deploy witness
 
 Working cheat sheet (no global install needed — `npx` works):
 
+> **Prerequisite:** the CLI must be authenticated. If `npx -y @alternatefutures/acc whoami --json`
+> returns `{"authenticated": false}`, run `npx -y @alternatefutures/acc login --email` first
+> (browser/email code). Unauthenticated commands start an interactive login and **hang**, so
+> always check `whoami --json` before scripted CLI use.
+
 ```powershell
 npx -y @alternatefutures/acc services -p witness-agentika list
 npx -y @alternatefutures/acc services -p witness-agentika info cmvbc3e5706exe41rs9g87kmn
@@ -106,10 +111,12 @@ errors or rate-limits mid-demo — Witness falls back to the deterministic
 label/fixture path, so a case is never dropped. Check `GET /api/adapters` to confirm
 what is live, and `GET /api/eval` to confirm the gate still passes.
 
-## Postgres audit ledger (durable across redeploys)
+## Postgres audit ledger (optional; prerequisites for cross-redeploy durability)
 
-The SQLite ledger lives inside the container, so a redeploy starts a fresh chain.
-For a durable ledger, deploy the managed Postgres template and link it:
+The SQLite ledger lives inside the container filesystem, which is **ephemeral**: it
+survives a process restart (verified) but **not** a redeploy / container replacement
+(no persistent volume is mounted). For a durable ledger, deploy the managed Postgres
+template and link it:
 
 ```powershell
 npx -y @alternatefutures/acc services create --kind template --template postgres --name witness-db -y
@@ -120,11 +127,13 @@ npx -y @alternatefutures/acc services -p witness-agentika info cmvbc3e5706exe41r
 Linking injects the connection string into the app service (as `DATABASE_URL` /
 `POSTGRES_URL`). Set `AUDIT=postgres`, **Rebuild → Deploy**, then confirm with:
 
-- `GET /api/adapters` → `"audit": "postgres(fallback:sqlite)"`
+- `GET /api/adapters` → `audit_active` is `postgres` or `postgres(fallback:sqlite)` and `audit_degraded` is `false`
 - `GET /api/audit/verify` → `{"ok": true, "ledger": "postgres", ...}`
 
-Because the ledger is now outside the container, a decision recorded before a
-**Redeploy** is still there afterwards — the redeploy no longer resets the chain.
+**In the current deployment this is NOT active.** The linked database landed on a
+different provider/cluster, so the app runs the SQLite fallback and reports
+`audit_degraded: true`, `audit_runtime_degraded`, and an `audit_note`. Durability
+holds only once `audit_active` reports Postgres.
 
 > **Placement caveat (observed).** Service linking resolves the target as
 > `<name>.<project>.internal`, which is a **cluster-local** name. If the app and the
@@ -134,6 +143,31 @@ Because the ledger is now outside the container, a decision recorded before a
 > `audit_requested` / `audit_active` / `audit_degraded` / `audit_note`. To get a
 > durable ledger, the two services must be co-located on the same provider/cluster.
 > Witness is built so that a missing or unreachable database never drops a case.
+
+## Persistence — what actually survives (verified)
+
+The audit ledger and the in-memory case store have **different** durability, and they
+must not be conflated:
+
+| Event | In-memory cases/decisions | Audit ledger (SQLite) |
+|---|---|---|
+| Process restart (same container, same `AUDIT_DB` on disk) | **Lost** — re-seeded fresh | **Retained** — same chain head, prior entries verified |
+| Container replacement / rebuild / redeploy (ephemeral FS) | Lost — re-seeded fresh | **Lost** — new empty chain |
+| Postgres active and reachable | Lost — re-seeded fresh | Retained (not currently active; see above) |
+
+Evidence (local, two separate `uvicorn` processes sharing one `AUDIT_DB`):
+
+```
+run1: decision -> APPROVED; chain ok, 6 entries, head 48a29db2...
+      [process stopped]
+run2: cases recreated (5), decided 0; case1 in-memory VERIFIED (decision cleared)
+      case1 ledger events: ['pipeline_run', 'human_decision']   <- persisted
+      chain ok, 6 entries, head 48a29db2...                     <- same head
+```
+
+So: a **hash chain that verifies proves integrity, not durability.** Durability across
+redeploys requires the Postgres backend (or a mounted persistent volume), neither of
+which is active in the current deployment.
 
 ## Confidential (TEE) deployment — attempted
 
@@ -151,6 +185,19 @@ confidential VM offer at the time), so the TEE deployment is documented as a
 **supported path, not a live one**. The proven `alternate-echo-whale-5578-github`
 service is never used as the guinea pig for this: TEE is always tried on a
 duplicate service so the submission URL stays up.
+
+**Current status (this environment): not verified, blocked.** Two attempts, identical
+incorrect configuration was not repeated a third time. The failure is at provider
+placement/start of a Confidential VM, not in Witness code. Retrying requires:
+
+1. `acc login --email` (the CLI in this workspace is currently **unauthenticated**, so
+   no deploy/attest/log command can run),
+2. a region/provider that actually offers a TEE-capable node, and
+3. the same duplicate-service approach so the production URL is untouched.
+
+If it succeeds, verify with `npx -y @alternatefutures/acc attest <tee-service-id>` (add
+`--verify` if the installed CLI supports it). Until then, **do not claim TEE protection
+or remote attestation.** The application never depends on confidential compute.
 
 ---
 

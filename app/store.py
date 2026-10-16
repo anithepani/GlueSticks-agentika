@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -48,8 +49,13 @@ class CaseStore:
         self._cases: dict[str, Case] = {}
         self._source = "unseeded"
         self._diagnostics: dict = {}
+        self._lock = threading.RLock()
 
     def seed(self) -> int:
+        with self._lock:
+            return self._seed_locked()
+
+    def _seed_locked(self) -> int:
         packets, source, diagnostics = load_packets(self._dir)
         self._source = source
         self._diagnostics = diagnostics
@@ -65,76 +71,83 @@ class CaseStore:
         return created
 
     def diag(self) -> dict:
-        return {"seed_source": self._source, "cases_loaded": len(self._cases), **self._diagnostics}
+        with self._lock:
+            return {"seed_source": self._source, "cases_loaded": len(self._cases), **self._diagnostics}
 
     def reseed(self) -> int:
-        self._cases.clear()
-        return self.seed()
+        with self._lock:
+            self._cases.clear()
+            return self._seed_locked()
 
     def add_case(self, payload: dict) -> Case:
-        if len(self._cases) >= MAX_INTAKE_CASES:
-            raise ValueError(f"intake limit reached ({MAX_INTAKE_CASES} cases)")
-        packet = self._intake_packet(payload)
-        extractor = intake_extractor()
-        case = run_pipeline(packet, self._bundle, extractor=extractor)
-        self._cases[case.id] = case
-        case.log("intake_submitted", f"case created via API with {len(case.documents)} document(s)")
-        self._bundle.audit.append(
-            case.id,
-            "intake",
-            "officer",
-            {
-                "applicant_name": case.applicant_name,
-                "documents": len(case.documents),
-                "extractor": extractor.name,
-            },
-        )
-        self._record_pipeline(case)
-        return case
+        with self._lock:
+            if len(self._cases) >= MAX_INTAKE_CASES:
+                raise ValueError(f"intake limit reached ({MAX_INTAKE_CASES} cases)")
+            packet = self._intake_packet(payload)
+            extractor = intake_extractor()
+            case = run_pipeline(packet, self._bundle, extractor=extractor)
+            self._cases[case.id] = case
+            case.log("intake_submitted", f"case created via API with {len(case.documents)} document(s)")
+            self._bundle.audit.append(
+                case.id,
+                "intake",
+                "officer",
+                {
+                    "applicant_name": case.applicant_name,
+                    "documents": len(case.documents),
+                    "extractor": extractor.name,
+                },
+            )
+            self._record_pipeline(case)
+            return case
 
     def resubmit(self, case_id: str, documents: list[dict]) -> Case:
-        case = self._cases.get(case_id)
-        if case is None:
-            raise KeyError(case_id)
-        if case.status != STATUS_INFO_REQUESTED:
-            raise ValueError(f"case in status {case.status} is not awaiting information")
-        cleaned = self._clean_documents(documents)
-        if not cleaned:
-            raise ValueError("at least one document with text is required")
+        with self._lock:
+            case = self._cases.get(case_id)
+            if case is None:
+                raise KeyError(case_id)
+            if case.status != STATUS_INFO_REQUESTED:
+                raise ValueError(f"case in status {case.status} is not awaiting information")
+            cleaned = self._clean_documents(documents)
+            if not cleaned:
+                raise ValueError("at least one document with text is required")
 
-        existing = [{"doc_id": d.doc_id, "title": d.title, "text": d.text} for d in case.documents]
-        for index, document in enumerate(cleaned):
-            document["doc_id"] = f"d{len(existing) + index + 1}"
+            existing = [
+                {"doc_id": d.doc_id, "title": d.title, "text": d.text}
+                for d in case.documents
+            ]
+            for index, document in enumerate(cleaned):
+                document["doc_id"] = f"d{len(existing) + index + 1}"
 
-        packet = {
-            "id": case.id,
-            "applicant_name": case.applicant_name,
-            "applicant_cnic": case.applicant_cnic,
-            "province": case.province,
-            "documents": existing + cleaned,
-        }
-        updated = run_pipeline(packet, self._bundle, extractor=intake_extractor())
-        case.documents = updated.documents
-        case.facts = updated.facts
-        case.rules = updated.rules
-        case.verification = updated.verification
-        case.recommendation = updated.recommendation
-        case.status = updated.status
-        case.decision = None
-        case.touch()
-        case.log("resubmit", f"{len(cleaned)} new document(s); pipeline re-run -> {case.status}")
-        self._bundle.audit.append(
-            case.id,
-            "resubmit",
-            "officer",
-            {
-                "documents": len(cleaned),
-                "status": case.status,
-                "verification": case.verification.status,
-                "outcome": case.recommendation.outcome,
-            },
-        )
-        return case
+            packet = {
+                "id": case.id,
+                "applicant_name": case.applicant_name,
+                "applicant_cnic": case.applicant_cnic,
+                "province": case.province,
+                "documents": existing + cleaned,
+            }
+            updated = run_pipeline(packet, self._bundle, extractor=intake_extractor())
+            case.documents = updated.documents
+            case.facts = updated.facts
+            case.rules = updated.rules
+            case.verification = updated.verification
+            case.recommendation = updated.recommendation
+            case.status = updated.status
+            case.decision = None
+            case.touch()
+            case.log("resubmit", f"{len(cleaned)} new document(s); pipeline re-run -> {case.status}")
+            self._bundle.audit.append(
+                case.id,
+                "resubmit",
+                "officer",
+                {
+                    "documents": len(cleaned),
+                    "status": case.status,
+                    "verification": case.verification.status,
+                    "outcome": case.recommendation.outcome,
+                },
+            )
+            return case
 
     def _intake_packet(self, payload: dict) -> dict:
         name = str(payload.get("applicant_name", "")).strip()
@@ -172,7 +185,18 @@ class CaseStore:
         return cleaned
 
     def _next_intake_id(self) -> str:
+        """A fresh intake id that cannot collide with any id already in the ledger.
+
+        The in-memory cases are rebuilt on every start, but the audit ledger is not,
+        so the counter must also account for ids the ledger already holds. Otherwise a
+        new case could reuse an old id and its pipeline_run entry would be suppressed
+        as a duplicate while prior history stayed attached to it.
+        """
         used = set(self._cases)
+        try:
+            used |= self._bundle.audit.case_ids()
+        except Exception:
+            pass
         serial = 1
         while f"INTK-{serial:04d}" in used:
             serial += 1
@@ -194,87 +218,101 @@ class CaseStore:
         )
 
     def list(self) -> list[Case]:
-        return [self._cases[case_id] for case_id in sorted(self._cases)]
+        with self._lock:
+            return [self._cases[case_id] for case_id in sorted(self._cases)]
 
     def get(self, case_id: str) -> Case | None:
-        return self._cases.get(case_id)
+        with self._lock:
+            return self._cases.get(case_id)
 
     def summaries(self) -> list[dict]:
-        return [
-            {
-                "id": case.id,
-                "applicant_name": case.applicant_name,
-                "province": case.province,
-                "status": case.status,
-                "outcome": case.recommendation.outcome if case.recommendation else None,
-                "verification": case.verification.status if case.verification else None,
-                "decision": case.decision.action if case.decision else None,
-                "assignee": case.assignee,
-                "age_minutes": round(age_minutes(case), 1),
-                "sla_breached": sla_breached(case),
-            }
-            for case in self.list()
-        ]
+        with self._lock:
+            cases = [self._cases[case_id] for case_id in sorted(self._cases)]
+            return [
+                {
+                    "id": case.id,
+                    "applicant_name": case.applicant_name,
+                    "province": case.province,
+                    "status": case.status,
+                    "outcome": case.recommendation.outcome if case.recommendation else None,
+                    "verification": case.verification.status if case.verification else None,
+                    "decision": case.decision.action if case.decision else None,
+                    "assignee": case.assignee,
+                    "age_minutes": round(age_minutes(case), 1),
+                    "sla_breached": sla_breached(case),
+                }
+                for case in cases
+            ]
 
     def assign(self, case_id: str, officer: str) -> Case:
-        case = self._cases.get(case_id)
-        if case is None:
-            raise KeyError(case_id)
-        officer = (officer or "").strip()
-        if not officer:
-            raise ValueError("officer name is required")
-        case.assignee = officer
-        case.assigned_at = _now()
-        case.touch()
-        case.log("assigned", f"assigned to {officer}")
-        self._bundle.audit.append(case.id, "assigned", officer, {"assignee": officer})
-        return case
+        with self._lock:
+            case = self._cases.get(case_id)
+            if case is None:
+                raise KeyError(case_id)
+            officer = (officer or "").strip()
+            if not officer:
+                raise ValueError("officer name is required")
+            case.assignee = officer
+            case.assigned_at = _now()
+            case.touch()
+            case.log("assigned", f"assigned to {officer}")
+            self._bundle.audit.append(case.id, "assigned", officer, {"assignee": officer})
+            return case
 
     def decide(self, case_id: str, officer: str, action: str, reason: str) -> Case:
-        case = self._cases.get(case_id)
-        if case is None:
-            raise KeyError(case_id)
-        if action not in ACTIONS:
-            raise ValueError(f"action must be one of {', '.join(ACTIONS)}")
-        if case.status not in DECIDABLE_STATUSES:
-            raise ValueError(f"case in status {case.status} cannot be decided")
-        officer = (officer or "").strip()
-        reason = (reason or "").strip()
-        if not officer:
-            raise ValueError("officer name is required")
-        if len(reason) < 3:
-            raise ValueError("a written reason is required")
+        with self._lock:
+            case = self._cases.get(case_id)
+            if case is None:
+                raise KeyError(case_id)
+            if action not in ACTIONS:
+                raise ValueError(f"action must be one of {', '.join(ACTIONS)}")
+            if case.status not in DECIDABLE_STATUSES:
+                raise ValueError(f"case in status {case.status} cannot be decided")
+            officer = (officer or "").strip()
+            reason = (reason or "").strip()
+            if not officer:
+                raise ValueError("officer name is required")
+            if len(reason) < 3:
+                raise ValueError("a written reason is required")
 
-        case.decision = Decision(officer=officer, action=action, reason=reason, decided_at=_now())
-        case.status = FINAL_BY_ACTION[action]
-        case.touch()
-        case.log("human_decision", f"{action} by {officer}")
-        self._bundle.audit.append(
-            case.id,
-            "human_decision",
-            officer,
-            {
-                "action": action,
-                "reason": reason,
-                "status": case.status,
-                "outcome": case.recommendation.outcome if case.recommendation else None,
-                "verification": case.verification.status if case.verification else None,
-            },
-        )
-        return case
+            verification_status = case.verification.status if case.verification else None
+            outcome = case.recommendation.outcome if case.recommendation else None
+            overrode_abstention = verification_status == "ABSTAIN"
+
+            case.decision = Decision(officer=officer, action=action, reason=reason, decided_at=_now())
+            case.status = FINAL_BY_ACTION[action]
+            case.touch()
+            case.log("human_decision", f"{action} by {officer}")
+            self._bundle.audit.append(
+                case.id,
+                "human_decision",
+                officer,
+                {
+                    "action": action,
+                    "reason": reason,
+                    "status": case.status,
+                    "outcome": outcome,
+                    "verification": verification_status,
+                    "overrode_abstention": overrode_abstention,
+                },
+            )
+            return case
 
     def stats(self) -> dict:
-        counters: dict[str, int] = {}
-        for case in self._cases.values():
-            counters[case.status] = counters.get(case.status, 0) + 1
-        return {
-            "total": len(self._cases),
-            "by_status": counters,
-            "decided": sum(1 for c in self._cases.values() if c.decision is not None),
-            "unassigned_open": sum(1 for c in self._cases.values() if c.status in OPEN_STATUSES and not c.assignee),
-            "sla_breached": sum(1 for c in self._cases.values() if sla_breached(c)),
-            "sla_hours": SLA_HOURS,
-        }
+        with self._lock:
+            counters: dict[str, int] = {}
+            for case in self._cases.values():
+                counters[case.status] = counters.get(case.status, 0) + 1
+            return {
+                "total": len(self._cases),
+                "by_status": counters,
+                "decided": sum(1 for c in self._cases.values() if c.decision is not None),
+                "unassigned_open": sum(
+                    1 for c in self._cases.values() if c.status in OPEN_STATUSES and not c.assignee
+                ),
+                "sla_breached": sum(1 for c in self._cases.values() if sla_breached(c)),
+                "sla_hours": SLA_HOURS,
+            }
 
 
 def _now() -> str:

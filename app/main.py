@@ -1,7 +1,9 @@
-"""Witness API. Stage 1: a walking skeleton over an in-memory case store.
+"""Witness API.
 
-Stable surface: the app reads PORT from the environment so the Alternate Clouds
-Source-tab port can never drift from what the app listens on.
+A human-in-the-loop decision desk over a swappable pipeline. The app reads PORT
+from the environment so the Alternate Clouds Source-tab port can never drift from
+what the app listens on. The pipeline can reach VERIFIED / NEEDS_REVIEW but never
+auto-denies: DENIED is only reachable through an explicit human decision.
 """
 
 from __future__ import annotations
@@ -213,6 +215,8 @@ def decide(case_id: str, payload: DecisionIn, request: Request) -> dict:
 
 @app.get("/api/cases/{case_id}/audit")
 def case_audit(case_id: str, request: Request) -> dict:
+    if _store(request).get(case_id) is None:
+        raise HTTPException(status_code=404, detail="case not found")
     entries = request.app.state.bundle.audit.entries(case_id)
     return {"case_id": case_id, "entries": entries}
 

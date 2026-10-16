@@ -87,6 +87,13 @@ class ResilientAudit:
             self.degraded = True
             return self._fallback.has_event(case_id, event)
 
+    def case_ids(self) -> set[str]:
+        try:
+            return self._active().case_ids()
+        except Exception:
+            self.degraded = True
+            return self._fallback.case_ids()
+
     def verify(self) -> dict:
         try:
             result = dict(self._active().verify())

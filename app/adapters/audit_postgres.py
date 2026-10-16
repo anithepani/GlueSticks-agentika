@@ -120,8 +120,16 @@ class PostgresAudit:
                 )
                 return cur.fetchone() is not None
 
+    def case_ids(self) -> set[str]:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT DISTINCT case_id FROM entries WHERE case_id IS NOT NULL")
+                return {row[0] for row in cur.fetchall()}
+
     def verify(self) -> dict:
-        return verify_entries(self.entries())
+        result = verify_entries(self.entries())
+        result["ledger"] = self.name
+        return result
 
 
 def try_postgres() -> PostgresAudit | None:
