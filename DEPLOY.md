@@ -135,6 +135,23 @@ Because the ledger is now outside the container, a decision recorded before a
 > durable ledger, the two services must be co-located on the same provider/cluster.
 > Witness is built so that a missing or unreachable database never drops a case.
 
+## Confidential (TEE) deployment — attempted
+
+`--confidential` must be set on a *redeploy* (a GitHub create cannot take it):
+
+```powershell
+npx -y @alternatefutures/acc services -p witness-agentika create --kind github ^
+  --repo anithepani/GlueSticks-agentika --branch main --name witness-tee -y
+npx -y @alternatefutures/acc services -p witness-agentika deploy witness-tee --confidential -y
+npx -y @alternatefutures/acc services -p witness-agentika attest witness-tee
+```
+
+On this account the confidential redeploy failed twice with `CVM failed` (no viable
+confidential VM offer at the time), so the TEE deployment is documented as a
+**supported path, not a live one**. The proven `alternate-echo-whale-5578-github`
+service is never used as the guinea pig for this: TEE is always tried on a
+duplicate service so the submission URL stays up.
+
 ---
 
 ## Troubleshooting (from the organizers' guide)
