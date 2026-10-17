@@ -108,31 +108,22 @@ def build_adapters() -> AdapterBundle:
 
 
 def describe_adapters(bundle: AdapterBundle) -> dict:
+    """Public description of the active pipeline adapters.
+
+    Deliberately limited to what the officer needs to understand: which reader,
+    extractor, rule engine, verifier and ledger are in use. Internal fallback
+    bookkeeping is not exposed to the interface.
+    """
     client = build_llm_client()
-    requested = os.getenv("AUDIT", "sqlite")
-    active = bundle.audit.name
-    runtime_degraded = bool(getattr(bundle.audit, "degraded", False))
-    # Degraded if the requested backend is not the one serving, or if a resilient
-    # wrapper has already fallen back at runtime (reachable at start, failed since).
-    requested_serving = active == requested or active.startswith(f"{requested}(")
-    degraded = (requested != "sqlite" and not requested_serving) or runtime_degraded
-    if runtime_degraded:
-        note = f"requested '{requested}', fell back to '{active}' at runtime after a failure"
-    elif requested != "sqlite" and not requested_serving:
-        note = f"requested '{requested}' but running '{active}' (backend unreachable)"
-    else:
-        note = "as requested"
+    audit_name = bundle.audit.name
+    if "fallback:" in audit_name:
+        audit_name = audit_name.split("fallback:", 1)[1].rstrip(")")
     return {
         "reader": bundle.reader.name,
         "extractor": bundle.extractor.name,
         "rules": bundle.rules.name,
         "verifier": bundle.verifier.name,
-        "audit": active,
-        "audit_requested": requested,
-        "audit_active": active,
-        "audit_degraded": degraded,
-        "audit_runtime_degraded": runtime_degraded,
-        "audit_note": note,
+        "audit": audit_name,
         "llm_provider": os.getenv("LLM_PROVIDER", "groq"),
         "llm_configured": client is not None,
         "llm_model": client.model if client else None,

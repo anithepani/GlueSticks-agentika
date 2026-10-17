@@ -30,7 +30,7 @@ port behind an environment flag, so components can be upgraded without a rewrite
 | `READER` | `pdf`, `text` | document reader (`pdf` also reads plain text) |
 | `EXTRACTOR` | `fixture`, `labels`, `llm` | fact extraction |
 | `VERIFIER` | `det`, `llm` | abstain / audit |
-| `AUDIT` | `sqlite`, `postgres` | audit storage |
+| `AUDIT` | `sqlite` | append-only, hash-chained decision ledger |
 | `LLM_PROVIDER` | `groq`, `gemini` | which free provider the LLM adapters use |
 | `WITNESS_STRICT` | `0`, `1` | refuse to serve if the evaluation gate fails |
 | `WITNESS_SLA_HOURS` | number | case queue SLA threshold |
@@ -88,14 +88,19 @@ See `DEPLOY.md`.
     it implements and the UI shows it.
   - **PDF intake** (`READER=pdf`): a PDF is read page-by-page and flows through the
     same grounding/rules/verify pipeline.
-  - **Postgres audit** (`AUDIT=postgres`) via a linked database service, with a
-    SQLite fallback so the app never dies if the database is unreachable.
+  - **Tamper-evident ledger**: every decision is appended to a hash chain that can be
+    re-verified from the interface, with a demonstration of what tampering looks like.
   - **Fail-closed evaluation gate**: with `WITNESS_STRICT=1` the app refuses to
     serve unless the gate passes; `/health` reports the gate.
   - **Tamper demo** (`POST /api/audit/tamper-demo`) shows a forged ledger copy
     breaking the hash chain while the real ledger stays intact.
   - Officer **assignment + SLA/aging**; **observability** with `x-request-id`,
     JSON access logs, and `/api/metrics`.
+
+- **Stage 5** — interface redesign. The frontend is now a casework console: a light,
+  typographic interface with a queue, per-case workspace, tabbed evidence, a sticky officer
+  decision panel, a rendered policy document, a quality report, and an activity timeline.
+  All internal storage and adapter detail was removed from the user-facing text.
 
 ## Tests
 
@@ -118,18 +123,14 @@ abstention-override recording, invalid-transition rejection and the tamper demo.
 
 ## Persistence
 
-The seeded cases and decisions are held in memory; the audit ledger is stored by the
-`AUDIT` backend. These have **different durability**:
+Case state is held in memory and reseeded on start. The decision ledger is an
+append-only, hash-chained SQLite database stored beside the application.
 
-- **SQLite (default):** survives a *process restart* on the same filesystem, and the
-  chain verifies unchanged. It does **not** survive a *redeploy* (the container
-  filesystem is ephemeral; no persistent volume is mounted).
-- **Postgres:** would survive redeploys, but the linked database in the current
-  deployment is on a different provider/cluster and is unreachable, so the app runs
-  the SQLite fallback and reports `audit_degraded: true`.
+- It survives a **process restart** on the same filesystem; the chain verifies unchanged.
+- It is reset when the service is **redeployed**, because the container filesystem is
+  replaced.
 
-A verifying hash chain proves **integrity**, not durability. See `DEPLOY.md` for the
-verified persistence table.
+A verifying hash chain proves **integrity**, not durability. See `DEPLOY.md`.
 
 ## Docker image
 

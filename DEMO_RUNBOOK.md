@@ -1,163 +1,159 @@
 # Witness - demo runbook (video + screenshots)
 
-Everything below is written against the **live** service as of 17 Oct 2026, 07:50 PKT.
+Written against the redesigned console (v0.5.0). Every navigation step below matches the
+live interface.
 
 - **Primary URL:** https://alternate-echo-whale-5578-github-app.alternatefutures.ai
-- **Fallback URL:** https://witness-tee-app.alternatefutures.ai (same app, separate in-memory
-  data; not TEE-attested - never call it confidential)
-- **Build:** v0.4.0, image `8c0478e`
-- **Expected header:** `API online · v0.4.0 · stage 3` and a **clickable** status pill
-  that opens **System & Adapters**.
+- **Fallback URL:** https://witness-tee-app.alternatefutures.ai (a second deployment of the
+  same application; use only if the primary URL misbehaves)
+- **Top bar:** `Witness` · Cases · Policy · Quality · About · `New case` · `Live`
+- **Target length:** 2:30-2:55
 
-> **Never show** the Alternate Clouds dashboard environment-variables tab, the CLI
-> `printenv` output, or any terminal with keys. Record only the browser app.
+> **Never show** the Alternate Clouds dashboard environment-variables tab, a terminal with
+> keys, or the CLI `printenv` output. Record only the browser app.
 
 ---
 
-## 0. Pre-flight (2 minutes, before recording)
+## 0. Pre-flight (2 minutes)
 
 1. Open the primary URL in a fresh window. Close other tabs; hide the bookmarks bar.
-2. Zoom to 100-110% so the case table is legible at 1080p.
-3. Confirm the status pill reads `API online · v0.4.0 · stage 3`.
-4. Click **System & Adapters** once and confirm it renders, then go back (click a case).
-5. Press **Reseed cases** once so the queue is in a known state (5 cases, none decided).
-   - Reseeding does **not** clear the audit ledger. That is intentional; the demo script
-     decides a case and then shows the ledger, so a pre-existing ledger is fine.
-6. In `/api/audit/verify` (open in a scratch tab, not on camera) confirm `"ok": true`.
-7. If anything looks wrong, switch to the fallback URL and repeat steps 2-6.
+2. Zoom to 100-110% so tables are legible at 1080p.
+3. Confirm the top-right indicator reads **Live**.
+4. Open **About** once to confirm it renders, then return to **Cases**.
+5. Open **About → Reset demonstration data** so the queue is back to 5 cases, none decided.
+   - This resets the in-memory cases only. The audit ledger is not erased; the demo decides
+     a case and then shows the ledger, so existing entries are fine.
+6. If anything looks wrong, switch to the fallback URL and repeat.
 
-**Recording settings:** 1440x900 or 1920x1080, 30 fps, system audio optional. Target 2:30-2:45.
+**Recording:** 1440x900 or 1920x1080, 30 fps, system audio optional.
 
 ---
 
 ## 1. Case facts you can state confidently
 
-| Case | Status | Verification | What it demonstrates |
+| Case | State | Check | What it demonstrates |
 |---|---|---|---|
-| `CASE-2026-0001` Ayesha Bibi | `VERIFIED` | `OK` | 7 facts, all 7 rules PASS, recommendation ELIGIBLE, still needs a human |
-| `CASE-2026-0002` Bilal Khan | `NEEDS_REVIEW` | `ABSTAIN` | income missing -> `INCOME_LIMIT UNKNOWN` -> escalate; **best case for the request-info/resubmit beat** |
-| `CASE-2026-0003` Nadia Rehman | `NEEDS_REVIEW` | `ABSTAIN` | two income figures (45,000 vs 90,000) -> **Conflicting evidence** panel |
-| `CASE-2026-0004` Imran Shah | `NEEDS_REVIEW` | `ABSTAIN` | income fact has **no citation** -> grounding fails, `ABSTAIN` **even though every rule PASSes** |
-| `CASE-2026-0005` Sana Malik | `NEEDS_REVIEW` | `OK` | 4 rule FAILs (income, car, land, savings) but **never DENIED** |
-
-Every case shows a **Policy clause** column in the rules table (Clause 1-7).
+| `CASE-2026-0001` Ayesha Bibi | Verified | Passed | 7 facts, all 7 clauses met, assessment Eligible - still needs a person |
+| `CASE-2026-0002` Bilal Khan | Needs review | Abstained | income missing -> "Monthly income could not be found in the documents" -> escalate; **best case for request-info/resubmit** |
+| `CASE-2026-0003` Nadia Rehman | Needs review | Abstained | two income values (45,000 and 90,000) -> **Conflicting evidence** |
+| `CASE-2026-0004` Imran Shah | Needs review | Abstained | income fact has **no supporting quote**; every clause still reads **Met** |
+| `CASE-2026-0005` Sana Malik | Needs review | Passed | four clauses **Not met** - state is still Needs review, never Denied |
 
 ---
 
-## 2. Demo video - click-by-click (target 2:40)
+## 2. Demo video - click by click
 
-### 0:00-0:12 | Landing page
-- Stay on the queue. Say: *"Witness is a decision desk for high-stakes benefits screening.
-  The AI proposes, an independent check audits, and a human decides. The pipeline cannot deny
-  anyone."*
-- Gesture at the status pill: *"Live on Alternate Clouds."*
+### 0:00-0:12 | Case queue
+- Stay on **Cases**.
+- Say: *"Witness is a decision desk for high-stakes benefits screening. The pipeline
+  proposes an assessment, an independent check audits it, and an officer decides. The
+  pipeline cannot deny anyone."*
 
-### 0:12-0:35 | `CASE-2026-0001` - grounded evidence
-- Click **CASE-2026-0001 (Ayesha Bibi)** in the left queue.
-- Scroll to **Extracted facts & grounding**.
-- Point at one row: age 34 with the quote `"Age: 34 years"`, the document id and the span,
-  and the green **verified** mark. Say: *"Every fact carries the exact quote it came from.
-  The extractor cannot smuggle in a value without a citation."*
+### 0:12-0:35 | Grounded evidence - `CASE-2026-0001`
+- Click **Ayesha Bibi** in the queue.
+- You land on **Evidence**. Point at a fact row: age `34 years`, the quoted text
+  "Age: 34 years", the source link, and **Verified**.
+- Click one **source link**. It opens the **Documents** tab and highlights the quoted span
+  in the form.
+- Say: *"Every value is tied to the exact sentence it came from. A value without a
+  quotation cannot be endorsed."*
 
-### 0:35-0:55 | Rules and the recommendation
-- Scroll to **Deterministic rules**. Point at the 7 rows and the **Policy clause** column.
-- Say: *"Seven clauses run as ordinary code. The model never decides a rule. All pass, so the
-  pipeline recommends ELIGIBLE - note it is still only VERIFIED. It is waiting for a person."*
+### 0:35-0:55 | Clauses in code
+- Click the **Rules** tab.
+- Point at the seven rows, the **Clause** column, and the **Met** labels.
+- Say: *"Seven policy clauses run as ordinary code. The model never decides a clause.
+  All seven are met, so the assessment is Eligible - but the case is only Verified. It is
+  waiting for a person."*
 
-### 0:55-1:12 | The human decides
-- In **Human decision**, type officer: `Officer A. Raza`.
-- Reason: `All seven clauses pass and every citation is grounded in the source form.`
-- Choose **Approve** -> **Record human decision**.
-- Say: *"The decision requires my name and a written reason. The backend rejects an empty
-  reason, and a case cannot be decided twice."*
+### 0:55-1:15 | The human decision
+- In the right panel, choose **Approve**.
+- Officer: `Officer A. Raza`.
+- Reason: `All seven clauses are met and every fact is quoted from the application.`
+- Click **Approve application**.
+- Say: *"A decision needs an officer and a written reason. The backend rejects an empty
+  reason, and a decided case cannot be decided twice."*
 
-### 1:12-1:25 | The audit ledger
-- Point at the **Audit ledger** entries (intake, pipeline_run, assigned if used,
-  human_decision) and the short hashes.
-- Click **Verify audit chain** in the sidebar. When it says **audit chain intact**, say:
-  *"Every state change is hash-chained. Changing one entry breaks verification at that point."*
+### 1:15-1:35 | The ledger
+- You are taken to the **Activity** tab. Point at the timeline entries.
+- Click **Verify ledger** - it reports the ledger is intact.
+- Click **Simulate tampering** - it reports the forged copy was rejected at a specific
+  entry, and that the original ledger is intact.
+- Say: *"Every change is appended to a hash chain. Tampering is detected exactly where the
+  change was made."*
 
-### 1:25-1:45 | Abstention - `CASE-2026-0003`
-- Click **CASE-2026-0003 (Nadia Rehman)**.
-- Point at the **Conflicting evidence** panel: `monthly_income_pkr` with two rows
-  (45,000 in `d1`, 90,000 in `d2`) and both quotes.
-- Then point at **Independent verification ABSTAIN** and the reason list.
-- Say: *"Two sources disagree. The verifier refuses to guess and escalates. The state is
-  NEEDS_REVIEW, not DENIED."*
+### 1:35-1:55 | Abstention on conflicting evidence - `CASE-2026-0003`
+- Click **Back to queue**, open **Nadia Rehman**.
+- Point at **Conflicting evidence**: monthly income with 45,000 and 90,000, both quoted.
+- Click **Verification**: the result is **Abstained**, with the reason.
+- Say: *"Two documents disagree. The verifier refuses to guess and escalates. The state is
+  Needs review, not Denied."*
 
-### 1:45-2:05 | Missing evidence -> request info -> resubmit - `CASE-2026-0002`
-- Click **CASE-2026-0002 (Bilal Khan)**.
-- Point at `INCOME_LIMIT UNKNOWN` and the reason "monthly income evidence is missing".
-- Fill officer `Officer A. Raza`, action **Request more info**, reason
-  `Income statement was not attached; requesting it.` -> record.
-- In the resubmit box, paste:
-  `Monthly household income: PKR 40,000`
-  -> **Resubmit and re-run pipeline**.
-- The case becomes **VERIFIED / ELIGIBLE** with 7 grounded facts, no decision attached.
-- Say: *"New evidence re-runs the whole pipeline. The case reopens; no decision was carried over."*
+### 1:55-2:15 | Request information -> resubmit - `CASE-2026-0002`
+- Open **Bilal Khan**.
+- In the panel, choose **Request information**, officer `Officer A. Raza`, reason
+  `Income statement was not attached.`
+- Click **Request information**.
+- In the resubmit panel, paste: `Monthly household income: PKR 40,000`
+- Click **Resubmit and re-run**.
+- The case returns as **Verified**, 7 grounded facts, no decision carried over.
+- Say: *"New evidence re-runs the whole pipeline. The case reopens."*
 
-### 2:05-2:15 | An uncited fact is enough to abstain - `CASE-2026-0004`
-- Click **CASE-2026-0004 (Imran Shah)**.
-- Point at the **verification** reason: `Grounding failed for 'Monthly income (PKR)': no
-  citation attached to this fact.`
-- Point at the rule table: every rule still says **PASS**.
-- Say: *"This is the subtle one: the rule passed, but the fact had no citation. The verifier
-  still refuses to endorse the case. Grounding is checked independently of the rule outcome."*
+### 2:15-2:25 | An uncited fact is enough - `CASE-2026-0004`
+- Open **Imran Shah** and click **Verification**.
+- Point at: `Monthly income (PKR) has no supporting quote in the documents.`
+- Then click **Rules**: every clause still says **Met**.
+- Say: *"The clause passed, but the fact had no quotation. The verifier still refuses to
+  endorse the case."*
 
-### 2:15-2:25 | Rule failures are still not denials - `CASE-2026-0005`
-- Click **CASE-2026-0005 (Sana Malik)**.
-- Point at the four FAIL rows (income, car, land, savings).
-- Say: *"Even here the automated state is NEEDS_REVIEW. A denial exists only if an officer
+### 2:25-2:35 | Failures are not denials - `CASE-2026-0005`
+- Open **Sana Malik**, **Rules** tab.
+- Point at four **Not met** clauses and the assessment callout.
+- Say: *"Even here the automated state is Needs review. A denial only exists if an officer
   writes one."*
 
-### 2:25-2:35 | Evaluation gate
-- Click **Evaluation** in the top bar.
-- Point at: **55/55 expectations**, grounding **0.971**, abstain **0.6**, and
-  **Invariant: no case auto-denied PASS**.
-- Say: *"The service refuses to start if this gate fails in strict mode."*
+### 2:35-2:47 | Quality gate
+- Click **Quality** in the top bar.
+- Point at 55/55 expectations, grounding 97%, abstention 60%, and **No automatic denial:
+  Holds**.
+- Say: *"The service re-runs this gate at start-up and refuses to serve if it fails."*
 
-### 2:35-2:45 | Tamper demo
-- Click **Tamper demo** in the sidebar.
-- Read the three lines: chain intact -> **forged copy detected at #N** -> real ledger untouched.
-- Say: *"Tampering is detected exactly at the changed entry, and the real ledger is untouched."*
-
-### 2:45-2:55 | System & Adapters (honesty)
-- Click the status pill (or **System & Adapters**).
-- Point at the **Audit Ledger** banner: requested `postgres`, active `sqlite`, degraded.
-- Say: *"We wired a managed Postgres ledger and linked it, but the two services landed on
-  different decentralized providers, so the cluster-local name cannot resolve. Witness
-  degrades to SQLite and says so instead of pretending. That is the reliability story."*
+### 2:47-2:57 | About
+- Click **About**.
+- Point at the pipeline summary and the deployment table (reader, model, verifier, ledger).
+- Say: *"The About page states exactly what is running. Nothing is hidden behind a
+  dashboard."*
 - Stop recording.
 
 ---
 
-## 3. Screenshots (12) - exact capture list
+## 3. Screenshots (12 + 2 proof shots)
 
-Save as `shot-01-...png` etc. Capture at the same zoom as the video.
+Save as `shot-01-...png`. Capture at the same zoom as the video.
 
 | # | Where | What must be visible |
 |---|---|---|
-| 1 | `/health` in browser | `"status":"ok"`, `"version":"0.4.0"`, `"gate":{"all_passed":true...}` |
-| 2 | `/` landing | Queue with 5 cases, status pill `API online`, all top-bar buttons |
-| 3 | `CASE-2026-0001` top | Name, `VERIFIED`, recommendation `ELIGIBLE`, "pipeline cannot deny" note |
-| 4 | `CASE-2026-0001` facts | At least two rows with quote + doc id + span + green verified |
-| 5 | `CASE-2026-0001` rules | 7 rows, statuses, **Policy clause** column |
-| 6 | `CASE-2026-0003` | **Conflicting evidence** panel with both income values and quotes |
-| 7 | `CASE-2026-0003` verification | `ABSTAIN` badge plus the reason list |
-| 8 | `CASE-2026-0004` | Grounding-failure reason for income, with every rule still `PASS` |
-| 9 | `CASE-2026-0001` after approve | Status `APPROVED`, officer + reason shown, ledger entries |
-| 10 | Evaluation panel | 55/55, 0.971, 0.6, `no_auto_deny PASS` |
-| 11 | Tamper demo result | intact -> broken at #N -> real ledger untouched |
-| 12 | System & Adapters | Audit banner (requested/active/degraded) + metrics cards |
-
-Optional 13: a PDF intake result (see section 4).
+| 1 | `/health` in browser | `"status":"ok"`, `"version":"0.5.0"`, `"gate":{"all_passed":true...}` |
+| 2 | Cases | 5 rows, status tags, filter chips, top bar |
+| 3 | Case 1 · Evidence | Fact rows with value, quoted text, source link, Verified |
+| 4 | Case 1 · Documents | The highlighted quotation inside the form text |
+| 5 | Case 1 · Rules | 7 clauses, all Met, Clause column |
+| 6 | Case 1 · decision panel | Approve / Deny / Request information + reason field |
+| 7 | Case 1 after approval | Decision record with officer, reason, timestamp |
+| 8 | Case 1 · Activity | Timeline + "Ledger intact" result |
+| 9 | Case 3 · Evidence | Conflicting evidence with 45,000 and 90,000, both quoted |
+| 10 | Case 3 · Verification | Abstained + reason list |
+| 11 | Case 4 · Verification | "no supporting quote" reason |
+| 12 | Quality | 55/55, 97%, 60%, "Holds" |
+| 13 | About | Pipeline summary + deployment table |
+| P1 | **Discord** | Both team members in the Alternate Futures server (display names visible) |
+| P2 | **Alternate Clouds dashboard** | The service and deployment status (Overview/Source, **not** the env-vars tab) |
 
 ---
 
-## 4. Optional live intake (text or PDF)
+## 4. Optional live intake
 
-**New case** takes a PDF (file picker) or pasted text. The deterministic label reader needs
-these exact labels, one per line:
+**New case** accepts a PDF (file picker or drag-and-drop) or pasted text. The reader needs
+these labels, one per line:
 
 ```
 Form B-1: Income Support Application
@@ -171,18 +167,14 @@ Land owned (acres): 0
 Bank balance: PKR 9,000
 ```
 
-Result: `VERIFIED` / `ELIGIBLE`, 7 grounded facts.
+Result: **Verified**, assessment **Eligible**, 7 grounded facts. Use **Load a sample
+packet** to fill the form in one click.
 
-**Contradiction demo:** paste the same form as Document 1, and as Document 2:
+**Contradiction demo:** put the same form in "Form text", and in "Additional evidence":
+`Monthly household income (revised): PKR 150,000` -> Needs review + conflict panel.
 
-```
-Income Verification Note
-Monthly household income (revised): PKR 150,000
-```
-
-Result: `NEEDS_REVIEW`, `ABSTAIN`, conflict panel.
-
-**Missing evidence:** omit the income line entirely -> `INCOME_LIMIT UNKNOWN` -> `NEEDS_REVIEW`.
+**Missing evidence:** delete the income line -> "Monthly income could not be found in the
+documents" -> Needs review.
 
 ---
 
@@ -190,22 +182,19 @@ Result: `NEEDS_REVIEW`, `ABSTAIN`, conflict panel.
 
 | Situation | What to do |
 |---|---|
-| Primary URL returns nginx 404 / 503 or does not load | Switch to the **fallback URL**, re-check the status pill, continue. Do not re-record unless the UI differs. |
-| LLM rate-limited or key issue | The app falls back automatically; facts show `fixture(fallback)`. Do not call it an error - it is the designed degradation. Do not mention the key. |
-| Audit badge says `Audit: SQLite fallback (degraded)` | Expected. Say the Postgres service is linked but cross-provider, so Witness degrades safely and reports it. |
-| Tamper demo says "no entries" | Decide a case first (approve case 1), then press Tamper demo. |
-| A case is already decided from a previous run | Press **Reseed cases** (queue resets; ledger history remains). |
-| Metrics P50/P95 show `-` | Harmless: the live image predates the percentile fix. Do not focus on it; the other cards are populated. |
-| You need to restart the demo | Press **Reseed cases**, then start from case 1. |
+| Primary URL does not load or returns 404/503 | Switch to the fallback URL and continue. |
+| Model rate-limited or unavailable | Extraction falls back to the deterministic reader; cases still ground and the gate still passes. Do not call it an error. |
+| A case is already decided | About -> **Reset demonstration data**, then start from case 1. |
+| Verification says "Earlier entry could not be..." | Not expected; use the fallback URL and tell the team. |
+| You need a clean ledger for the take | A ledger resets only on a new deployment. For the demo it is enough to reset cases; the ledger showing prior entries is realistic. |
 
 ---
 
 ## 6. Post-record checklist
 
-- [ ] Video is 2:30-2:50, no keys or dashboard env vars visible.
-- [ ] All 12 screenshots saved and legible.
-- [ ] Primary URL re-checked after recording: status pill online, `/api/eval` still
-      `all_passed: true`.
-- [ ] PDF (`Witness_Where_The_Human_Comes_In.pdf`) attached.
-- [ ] Repo URL + live URL copied into the submission form.
-- [ ] LinkedIn post written and posted by a human team member (not generated).
+- [ ] Video 2:30-2:57, no keys or dashboard env vars visible.
+- [ ] 12 interface screenshots + Discord + dashboard proof shots saved and legible.
+- [ ] Primary URL still online after recording; `/api/eval` still `all_passed: true`.
+- [ ] PDF `Witness_Submission.pdf` attached.
+- [ ] LinkedIn post and teammate reshare links copied into the PDF.
+- [ ] Submitted before 12:45 PM PKT.

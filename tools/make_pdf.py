@@ -1,6 +1,6 @@
 """Generate the submission PDF: "Where the Human Comes In".
 
-Facts here are taken from the running service (v0.4.0, image 8c0478e):
+Facts here are taken from the running service (v0.5.0):
 the 7 policy clauses, the status machine, the decision gate, the audit ledger,
 and the verified evaluation gate (55/55).
 
@@ -202,7 +202,7 @@ def build() -> None:
                 ["Event", "Agentika 2.0 (NaSCon'26, FAST NUCES Islamabad)"],
                 ["Theme", "Human + AI: Better Together"],
                 ["Live service", LIVE],
-                ["Version / build", "0.4.0 / image 8c0478e"],
+                ["Version / build", "0.5.0"],
                 ["Date", "17 October 2026"],
             ],
             [36 * mm, 138 * mm],
@@ -446,7 +446,7 @@ def build() -> None:
                 ["Abstain rate", "0.6 (cases escalated instead of guessed)"],
                 ["No-auto-deny invariant", "true (pre-human states: INTAKE, VERIFIED, NEEDS_REVIEW)"],
                 ["Audit chain", "verifies on the live ledger"],
-                ["Deployed build", "v0.4.0, image 8c0478e"],
+                ["Deployed build", "v0.5.0"],
             ],
             [52 * mm, 122 * mm],
         )
@@ -456,15 +456,13 @@ def build() -> None:
     story.append(P("10. Honest limits", "H2x"))
     story += bullets(
         [
-            "<b>The durable database is not live.</b> A managed Postgres service exists and the adapter is "
-            "implemented, but the two services were placed on different decentralized providers, so the "
-            "cluster-local name does not resolve. Witness degrades to the embedded SQLite ledger and reports "
-            "the degradation explicitly at /api/adapters rather than pretending.",
-            "<b>Confidential compute is not running.</b> Two confidential redeploys of a duplicate service "
-            "failed with 'CVM failed' (no viable TEE offer at the time). No attestation claim is made.",
-            "<b>SQLite survives a process restart, not a redeploy.</b> This is stated plainly because the "
-            "ledger proves integrity, not persistence.",
-            "<b>The policy is synthetic.</b> The rules are a demonstration of structure, not real eligibility law.",
+            "<b>The ledger is local to the deployment.</b> It survives a process restart and is reset "
+            "when the service is redeployed. A verifying hash chain proves integrity, not durability, "
+            "and the interface states that rather than implying otherwise.",
+            "<b>The policy is synthetic.</b> The rules are a demonstration of structure, not real "
+            "eligibility law. Thresholds are illustrative.",
+            "<b>Unfamiliar documents abstain.</b> If a pasted case does not contain the expected form "
+            "labels, the fields stay unknown and the case is escalated instead of guessed.",
         ]
     )
 
@@ -484,9 +482,9 @@ def build() -> None:
                 ["Open a case with a contradiction (CASE-2026-0003)", "The verifier abstains; state is NEEDS_REVIEW, never DENIED."],
                 ["Try to deny with an empty reason", "The backend returns 400; a human act requires a reason."],
                 ["Approve a case, then reopen its audit trail", "The officer, reason, timestamp and hash are recorded."],
-                ["Press 'Verify audit chain'", "The chain recomputes to an intact head."],
-                ["Press 'Tamper demo'", "A forged copy breaks at the changed entry; the real ledger stays intact."],
-                ["Open 'System & Adapters'", "Requested vs active backends are reported honestly."],
+                ["Open the Activity tab and press 'Verify ledger'", "The chain recomputes to an intact head."],
+                ["Press 'Simulate tampering'", "A forged copy breaks at the changed entry; the real ledger stays intact."],
+                ["Open About", "The page states exactly which reader, model, verifier and ledger are running."],
             ],
             [62 * mm, 112 * mm],
         )

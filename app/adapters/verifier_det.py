@@ -4,6 +4,8 @@ The verifier re-audits the pipeline's own work rather than trusting it. It refus
 to endorse a recommendation when a citation is not found verbatim in its source, a
 field has conflicting values, or a rule could not be decided. An abstain never
 denies anyone: it escalates the case to a human officer.
+
+Reasons are written for the officer reading them, not for a developer.
 """
 
 from __future__ import annotations
@@ -50,14 +52,20 @@ class DeterministicVerifier:
         for fact in facts:
             if fact.citation is None:
                 ok = False
-                note = "no citation attached to this fact"
+                note = "no supporting quote in the documents"
+                reason = f"{fact.label} has no supporting quote in the documents."
             else:
                 source = doc_text.get(fact.citation.doc_id)
                 ok = source is not None and fact.citation.quote in source
-                note = "quote found verbatim in source" if ok else "quote not found verbatim in source"
+                note = "quote found verbatim in the source" if ok else "quote not found in the source"
+                reason = (
+                    ""
+                    if ok
+                    else f"The quoted text for {fact.label} does not appear in the source document."
+                )
             checks.append({"check": "citation_grounding", "fact": fact.key, "ok": ok, "note": note})
             if not ok:
-                reasons.append(f"Grounding failed for '{fact.label}': {note}.")
+                reasons.append(reason)
 
     def _contradictions(self, facts: list[Fact], checks: list[dict], reasons: list[str]) -> None:
         grouped: dict[str, list[Fact]] = {}
@@ -66,12 +74,23 @@ class DeterministicVerifier:
         for key, items in grouped.items():
             values = sorted({repr(item.value) for item in items})
             ok = len(values) <= 1
-            note = "consistent" if ok else f"conflicting values: {', '.join(values)}"
+            label = items[0].label or key
+            if ok:
+                note = "consistent"
+            else:
+                shown = sorted({str(item.value) for item in items})
+                note = "conflicting values: " + ", ".join(shown)
             checks.append({"check": "contradiction", "fact": key, "ok": ok, "note": note})
             if not ok:
-                reasons.append(f"Conflicting values for '{key}': {', '.join(values)}.")
+                shown = sorted({str(item.value) for item in items})
+                reasons.append(f"Conflicting values for {label}: {' and '.join(shown)}.")
 
     def _undecided(self, rules: list[RuleResult], reasons: list[str]) -> None:
         for rule in rules:
-            if rule.status == "UNKNOWN":
-                reasons.append(f"Rule {rule.rule_id} could not be decided: {rule.detail}")
+            if rule.status != "UNKNOWN":
+                continue
+            # A conflict is already reported by the contradiction check; repeating it
+            # here would just print the same problem twice.
+            if rule.detail.startswith("Conflicting values"):
+                continue
+            reasons.append(f"{rule.title}: {rule.detail}")

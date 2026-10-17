@@ -16,6 +16,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app import __version__
@@ -52,6 +53,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Witness", version=__version__, lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 @app.middleware("http")
@@ -139,7 +141,6 @@ def info() -> dict:
     return {
         "name": "Witness",
         "tagline": "AI proposes, an independent check audits, a human decides.",
-        "stage": STAGE,
         "version": __version__,
     }
 

@@ -20,15 +20,16 @@ from app.models import (
 def build_recommendation(verification, rules) -> Recommendation:
     if verification.status == "ABSTAIN":
         return Recommendation(OUTCOME_NEEDS_REVIEW, list(verification.reasons))
-    failed = [rule.rule_id for rule in rules if rule.status == "FAIL"]
+    failed = [rule for rule in rules if rule.status == "FAIL"]
     if failed:
+        names = "; ".join(rule.title.lower() for rule in failed)
         return Recommendation(
             OUTCOME_NEEDS_REVIEW,
-            [f"Deterministic rule check failed: {', '.join(failed)}. A human must decide."],
+            [f"Not met: {names}. An officer makes the decision."],
         )
     return Recommendation(
         OUTCOME_ELIGIBLE,
-        ["All deterministic rules passed and every citation is grounded in its source."],
+        ["All seven clauses are met and every fact is supported by a quotation from the documents."],
     )
 
 
