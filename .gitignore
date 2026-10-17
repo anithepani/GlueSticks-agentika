@@ -16,5 +16,5 @@ venv/
 data/runtime/
 
 # local session/export artifacts (may contain secrets captured during debugging)
-my-session.json
+my-session*.json
 *.zip

@@ -8,7 +8,7 @@ __pycache__
 *.db
 *.sqlite
 *.sqlite3
-my-session.json
+my-session*.json
 *.zip
 tests/
 tools/

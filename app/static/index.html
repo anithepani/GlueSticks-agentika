@@ -93,7 +93,12 @@
     <button class="btn ghost small" onclick="showIntake()">New case</button>
     <button class="btn ghost small" onclick="showEval()">Evaluation</button>
     <button class="btn ghost small" onclick="showPolicy()">Policy</button>
-    <div class="status"><span id="dot" class="dot"></span><span id="stat">checking API…</span></div>
+    <button class="btn ghost small" onclick="showSystem()">System &amp; Adapters</button>
+    <div class="status" onclick="showSystem()" style="cursor:pointer" title="Click to view system status and adapters">
+      <span id="dot" class="dot"></span>
+      <span id="stat">checking API…</span>
+      <span id="degradedBadge" class="pill warn" style="display:none;margin-left:4px">Audit Degraded</span>
+    </div>
   </div>
 </div>
 
@@ -128,14 +133,32 @@ async function api(path, opts){
   return j;
 }
 
+let adapterInfo = null;
+
 async function pollHealth(){
   try{
-    const j = await api('/health');
+    const [j, adp] = await Promise.all([
+      api('/health'),
+      api('/api/adapters').catch(() => null)
+    ]);
+    adapterInfo = adp;
     $('dot').className = 'dot ok';
     $('stat').textContent = `API online · v${j.version} · stage ${j.stage}`;
+    const badge = $('degradedBadge');
+    if(badge){
+      if(adp && adp.audit_degraded){
+        badge.style.display = 'inline-block';
+        badge.textContent = 'Audit: SQLite fallback (degraded)';
+        badge.title = adp.audit_note || 'Requested postgres but running sqlite';
+      }else{
+        badge.style.display = 'none';
+      }
+    }
   }catch(e){
     $('dot').className = 'dot bad';
     $('stat').textContent = 'API unreachable';
+    const badge = $('degradedBadge');
+    if(badge) badge.style.display = 'none';
   }
 }
 
@@ -454,6 +477,116 @@ async function showPolicy(){
     $('detail').innerHTML = `<h1>Rule set</h1><p class="muted">The exact Markdown shipped with the app (<code>data/policy/rules.md</code>).</p><pre>${esc(r.rules_markdown)}</pre>`;
   }catch(err){
     $('detail').innerHTML = `<p class="bad">Policy unavailable: ${esc(err.message)}</p>`;
+  }
+}
+
+async function showSystem(){
+  $('detail').innerHTML = '<p class="muted">Loading system metrics and adapter status…</p>';
+  try{
+    const [adp, metrics, diag] = await Promise.all([
+      api('/api/adapters'),
+      api('/api/metrics').catch(() => null),
+      api('/api/diag').catch(() => null)
+    ]);
+
+    const isDegraded = adp && adp.audit_degraded;
+    const bannerHtml = isDegraded ? `
+      <div class="banner warn">
+        <b>⚠️ Audit Ledger Status: Degraded (Fallback to SQLite)</b>
+        <div class="muted" style="margin-top:6px">${esc(adp.audit_note)}</div>
+        <div class="muted" style="margin-top:6px">
+          The application requested <code>${esc(adp.audit_requested)}</code> as its primary ledger, but the database service is currently unreachable across provider tenant namespaces.
+          Witness's <code>ResilientAudit</code> adapter automatically degraded to the embedded SQLite hash-chain ledger so no case decisions or audit events are dropped.
+          <b>Note:</b> SQLite data lives in the local container filesystem and is ephemeral across container replacement / redeployments.
+        </div>
+      </div>` : `
+      <div class="banner good">
+        <b>✓ Audit Ledger: Healthy (${esc(adp ? adp.audit_active : 'sqlite')})</b>
+        <div class="muted" style="margin-top:6px">Audit records are actively committed to ${esc(adp ? adp.audit_active : 'sqlite')}.</div>
+      </div>`;
+
+    const metricsHtml = metrics ? `
+      <h2>Observability &amp; Metrics</h2>
+      <div class="metric">
+        <div class="card"><div class="n">${metrics.requests_total ?? 0}</div><div class="l">Total HTTP Requests Recorded</div></div>
+        <div class="card"><div class="n ok">${metrics.by_status ? (metrics.by_status['200'] || 0) : 0}</div><div class="l">Successful Requests (200 OK)</div></div>
+        <div class="card"><div class="n">${metrics.latency_ms ? metrics.latency_ms.p50 + 'ms' : '—'}</div><div class="l">P50 Request Latency</div></div>
+        <div class="card"><div class="n">${metrics.latency_ms ? metrics.latency_ms.p95 + 'ms' : '—'}</div><div class="l">P95 Request Latency</div></div>
+      </div>
+      <div class="metric" style="margin-top:10px">
+        <div class="card"><div class="n">${metrics.cases ? metrics.cases.total : 0}</div><div class="l">Total Tracked Cases (${metrics.cases ? metrics.cases.decided : 0} decided)</div></div>
+        <div class="card"><div class="n">${metrics.cases ? metrics.cases.unassigned_open : 0}</div><div class="l">Unassigned Open Cases</div></div>
+        <div class="card"><div class="n ${metrics.cases && metrics.cases.sla_breached > 0 ? 'bad' : 'ok'}">${metrics.cases ? metrics.cases.sla_breached : 0}</div><div class="l">SLA Breaches (>${metrics.cases ? metrics.cases.sla_hours : 24}h)</div></div>
+        <div class="card"><div class="n ${metrics.gate && metrics.gate.all_passed ? 'ok' : 'bad'}">${metrics.gate && metrics.gate.all_passed ? 'PASS' : 'FAIL'}</div><div class="l">Startup Evaluation Gate</div></div>
+      </div>` : '';
+
+    const diagHtml = diag ? `
+      <h2>Storage &amp; Runtime Diagnostic</h2>
+      <table>
+        <thead><tr><th>Component</th><th>Value</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Seed Source</td><td><code>${esc(diag.seed_source)}</code></td><td class="muted">Source of truth for initial seeded cases</td></tr>
+          <tr><td>Cases Loaded</td><td><code>${esc(diag.cases_loaded)}</code></td><td class="muted">Active cases in memory store</td></tr>
+        </tbody>
+      </table>` : '';
+
+    $('detail').innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <h1>System Architecture &amp; Adapters</h1>
+        <button class="btn ghost small" onclick="showSystem()">Refresh Status</button>
+      </div>
+      <p class="muted">Witness uses swappable hex-architecture ports for document reading, fact extraction, rules execution, verification, and audit logging.</p>
+
+      ${bannerHtml}
+
+      <h2>Swappable Ports &amp; Active Adapters</h2>
+      <table>
+        <thead><tr><th>Port</th><th>Active Adapter</th><th>Requested</th><th>State</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>Document Reader</b></td>
+            <td><code>${esc(adp ? adp.reader : '—')}</code></td>
+            <td class="muted">—</td>
+            <td class="ok">✓ Active (reads PDF page documents and plain text)</td>
+          </tr>
+          <tr>
+            <td><b>Fact Extractor</b></td>
+            <td><code>${esc(adp ? adp.extractor : '—')}</code></td>
+            <td class="muted">—</td>
+            <td>${adp && adp.extractor.includes('fallback') ? '<span class="warn">Resilient (LLM with deterministic fallback)</span>' : '<span class="ok">✓ Active</span>'}</td>
+          </tr>
+          <tr>
+            <td><b>Rules Engine</b></td>
+            <td><code>${esc(adp ? adp.rules : '—')}</code></td>
+            <td class="muted">—</td>
+            <td class="ok">✓ Active (deterministic 7-clause PMT rules)</td>
+          </tr>
+          <tr>
+            <td><b>Verifier</b></td>
+            <td><code>${esc(adp ? adp.verifier : '—')}</code></td>
+            <td class="muted">—</td>
+            <td>${adp && adp.verifier.includes('fallback') ? '<span class="warn">Resilient (LLM with deterministic checks)</span>' : '<span class="ok">✓ Active</span>'}</td>
+          </tr>
+          <tr>
+            <td><b>Audit Ledger</b></td>
+            <td><code>${esc(adp ? adp.audit_active : '—')}</code></td>
+            <td class="muted"><code>${esc(adp ? adp.audit_requested : '—')}</code></td>
+            <td>${isDegraded ? '<span class="bad">✗ DEGRADED (SQLite fallback active)</span>' : '<span class="ok">✓ ACTIVE</span>'}</td>
+          </tr>
+          <tr>
+            <td><b>LLM Provider</b></td>
+            <td><code>${esc(adp ? adp.llm_provider : '—')}</code> (${esc(adp && adp.llm_model ? adp.llm_model : 'no model')})</td>
+            <td class="muted">—</td>
+            <td>${adp && adp.llm_configured ? '<span class="ok">✓ Configured</span>' : '<span class="muted">Not configured (uses deterministic path)</span>'}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      ${metricsHtml}
+      ${diagHtml}
+    `;
+  }catch(err){
+    $('detail').innerHTML = `<p class="bad">System status unavailable: ${esc(err.message)}</p>`;
   }
 }
 
