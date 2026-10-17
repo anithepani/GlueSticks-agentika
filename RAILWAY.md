@@ -1,5 +1,7 @@
 # Backup deployment on Railway
 
+**Live backup URL:** https://witness-production-64ea.up.railway.app
+
 > **Competition status:** the submitted deployment is the one on **Clouds by Alternate
 > Futures**. The rules name it as the only accepted platform; this Railway deployment is a
 > demonstration backup only, used if the primary platform is unavailable during a live demo.
@@ -20,25 +22,21 @@ officer decision flow would appear to lose state.
 | `railway.json` | tells Railway to build the Dockerfile, healthcheck on `/health` |
 | `Procfile` | fallback start command (not used with the Dockerfile builder) |
 
-## Deploy with the CLI
+## What was run (verified)
 
 ```powershell
-# 1. Authenticate (opens a browser; one-time)
 npx -y @railway/cli login
-
-# 2. From the repository root, create or link a project
 npx -y @railway/cli init --name witness
-
-# 3. Deploy the current directory
 npx -y @railway/cli up --detach
-
-# 4. Environment (deterministic demo; no model key required)
+npx -y @railway/cli service witness
 npx -y @railway/cli variables --set "READER=pdf" --set "EXTRACTOR=fixture" `
   --set "VERIFIER=det" --set "AUDIT=sqlite" --set "WITNESS_STAGE=4"
-
-# 5. Public domain
 npx -y @railway/cli domain
 ```
+
+Verified on the Railway URL: `/health` 200 (`v0.5.0`, gate 55/55), `/api/cases` 5 cases,
+`/api/eval` all_passed, the console renders, an approval returns 200 and the audit chain
+verifies, and a reseed restores the five sample cases.
 
 Optional, to run with the model enabled:
 
