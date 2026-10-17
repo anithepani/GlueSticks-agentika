@@ -1,0 +1,14 @@
+.git
+.venv
+venv
+__pycache__
+*.py[cod]
+.env*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+my-session.json
+*.zip
+tests/
+tools/

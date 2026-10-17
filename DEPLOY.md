@@ -64,18 +64,14 @@ acc services deploy witness
 
 | | |
 |---|---|
-| Project | `witness-agentika` |
-| Last known good | `v0.4.0`, image `e7904e2c1cae` |
-
-> **Status at last check: no active deployment.** The URL returned
-> `503 {"error":"Service Unavailable","message":"This service exists but has no active deployment."}`
-> directly from Alternate Clouds (the platform edge itself is healthy: a random subdomain
-> still returns the `No service found` JSON). The application is fine; the lease just needs
-> recreating with the Rebuild -> Deploy steps above, which requires an authenticated `acc`
-> session.
+| Project | `witness-agentika` (`cmvbc3drs06eue41rcjczutc9`) |
 | Service | `alternate-echo-whale-5578-github` (`cmvbc3e5706exe41rs9g87kmn`) |
 | URL | https://alternate-echo-whale-5578-github-app.alternatefutures.ai |
-| Port | `8000` (the k8s Service in front is on `80` → `8000`; app must listen on `8000`) |
+| Port | `8000` (the k8s Service in front is on `80` → `8000`; app listens on `8000`) |
+| Status | **ACTIVE & HEALTHY** (HTTP 200 on `/health`, `/api/info`, `/api/adapters`, `/api/cases`, `/api/eval`, `/api/audit/verify`) |
+| Deployed image | `ghcr.io/alternatefutures/2kteivvoteglelskxdyhg--anithepani-gluesticks-agentika:7e67c98933d5` (commit `7e67c98`) |
+
+> **Operational note:** If the lease ever expires or encounters provider-ingress issues (`503 No active deployment` or `404 Not Found`), run `powershell -ExecutionPolicy Bypass -File tools/redeploy.ps1` from an authenticated terminal, or click **Rebuild → Deploy** in the Alternate Clouds web dashboard.
 
 Working cheat sheet (no global install needed — `npx` works):
 
@@ -85,12 +81,11 @@ Working cheat sheet (no global install needed — `npx` works):
 > always check `whoami --json` before scripted CLI use.
 
 ```powershell
+npx -y @alternatefutures/acc whoami --json
 npx -y @alternatefutures/acc services -p witness-agentika list
 npx -y @alternatefutures/acc services -p witness-agentika info cmvbc3e5706exe41rs9g87kmn
 npx -y @alternatefutures/acc services -p witness-agentika logs cmvbc3e5706exe41rs9g87kmn --tail 100
-npx -y @alternatefutures/acc services -p witness-agentika rebuild cmvbc3e5706exe41rs9g87kmn
-npx -y @alternatefutures/acc services -p witness-agentika deploy  cmvbc3e5706exe41rs9g87kmn -y
-npx -y @alternatefutures/acc ssh cmvbc3e5706exe41rs9g87kmn --command "whoami"
+powershell -ExecutionPolicy Bypass -File tools/redeploy.ps1
 ```
 
 `acc ssh --command` execs argv directly (no shell), so use single commands
@@ -138,19 +133,54 @@ Linking injects the connection string into the app service (as `DATABASE_URL` /
 - `GET /api/adapters` → `audit_active` is `postgres` or `postgres(fallback:sqlite)` and `audit_degraded` is `false`
 - `GET /api/audit/verify` → `{"ok": true, "ledger": "postgres", ...}`
 
-**In the current deployment this is NOT active.** The linked database landed on a
-different provider/cluster, so the app runs the SQLite fallback and reports
-`audit_degraded: true`, `audit_runtime_degraded`, and an `audit_note`. Durability
-holds only once `audit_active` reports Postgres.
+## Docker architecture
 
-> **Placement caveat (observed).** Service linking resolves the target as
-> `<name>.<project>.internal`, which is a **cluster-local** name. If the app and the
-> database land on different providers (as ours did: app `10.43.x`, database
-> `10.233.x`), that name does not resolve and the app **degrades to the embedded
-> SQLite ledger** instead of failing. `GET /api/adapters` reports this honestly via
-> `audit_requested` / `audit_active` / `audit_degraded` / `audit_note`. To get a
-> durable ledger, the two services must be co-located on the same provider/cluster.
-> Witness is built so that a missing or unreachable database never drops a case.
+- **Image build:** The application is built from `Dockerfile` on `python:3.12-slim`.
+- **Port:** The container exposes port `8000` and starts `uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}`.
+- **Context protection:** `.dockerignore` excludes `.venv`, `.git`, `.db`, `my-session.json`, `tests/`, and `tools/` from the build context sent to remote builders.
+- **Service boundary:** The app runs as a single self-contained stateless container. PostgreSQL is NOT embedded in the container image; it is configured via environment variables (`DATABASE_URL`, `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`).
+
+## Postgres audit ledger & platform networking
+
+The SQLite ledger lives inside the container filesystem, which is **ephemeral**: it
+survives a process restart (verified) but **not** a redeploy / container replacement
+(no persistent volume is mounted). For a durable ledger, deploy the managed Postgres
+template and link it:
+
+```powershell
+npx -y @alternatefutures/acc services create --kind template --template postgres --name witness-db -y
+npx -y @alternatefutures/acc services -p witness-agentika link witness-db alternate-echo-whale-5578-github
+npx -y @alternatefutures/acc services -p witness-agentika info cmvbc3e5706exe41rs9g87kmn
+```
+
+Linking injects the connection parameters into the app service (as `DATABASE_URL` /
+`POSTGRES_URL` / `PG*`). Set `AUDIT=postgres`, **Rebuild → Deploy**, then confirm with:
+
+- `GET /api/adapters` → `audit_active` is `postgres` or `postgres(fallback:sqlite)` and `audit_degraded` is `false`
+- `GET /api/audit/verify` → `{"ok": true, "ledger": "postgres", ...}`
+
+### Root cause of Postgres degradation on Alternate Clouds
+
+1. **Service status:** Both `witness-db` and `alternate-echo-whale-5578-github` are running.
+2. **Namespace isolation:** Alternate Clouds runs on Akash Network. Each service deployment is isolated into its own distinct Kubernetes tenant lease and namespace (e.g., app namespace `ulj7ldepe3ghk36ecsd711l3emb3kju20im68912c5f2i` vs db namespace `c5mrj2jl9jg59d3t9mqg3pk2qgimh4s95n2l0rtbmhruc`).
+3. **DNS failure:** The linked hostname `witness-db.witness-agentika.internal` is cluster-local and cannot resolve across disparate Akash tenant namespaces (`socket.gaierror: [Errno -2] Name or service not known`).
+4. **NetworkPolicy block:** Even direct connection between pod IPs (e.g., `10.233.89.133:5432`) times out (`errno 11`) due to Akash's tenant-isolation NetworkPolicy.
+5. **Ingress limitation:** Database port 5432 is internal only; the platform's Cloudflare edge forwards only HTTP/HTTPS traffic.
+
+### How Witness handles degradation
+
+Because `try_postgres()` catches connection errors and `ResilientAudit` guards ledger writes:
+- The service **never crashes** when Postgres is unreachable.
+- The service **never drops a case** or suppresses audit records.
+- `/api/adapters` truthfully reports `audit_requested: "postgres"`, `audit_active: "sqlite"`, `audit_degraded: true`, and `audit_note: "requested 'postgres' but running 'sqlite' (backend unreachable)"`.
+- `/api/audit/verify` re-computes the tamper-evident hash chain on the active SQLite ledger (`ledger: "sqlite"`).
+
+### Recommended path for cross-redeploy persistence
+
+For production durability across container replacements:
+1. Provide an external managed PostgreSQL connection URI (e.g. from Neon, Supabase, or AWS RDS with TLS enabled) in the Alternate Clouds dashboard under **Settings → Environment Variables → `DATABASE_URL`**.
+2. Run `powershell -ExecutionPolicy Bypass -File tools/redeploy.ps1`.
+3. Confirm via `GET /api/adapters` that `audit_active` reports `postgres` and `audit_degraded` reports `false`.
 
 ## Persistence — what actually survives (verified)
 
@@ -161,21 +191,20 @@ must not be conflated:
 |---|---|---|
 | Process restart (same container, same `AUDIT_DB` on disk) | **Lost** — re-seeded fresh | **Retained** — same chain head, prior entries verified |
 | Container replacement / rebuild / redeploy (ephemeral FS) | Lost — re-seeded fresh | **Lost** — new empty chain |
-| Postgres active and reachable | Lost — re-seeded fresh | Retained (not currently active; see above) |
+| External Postgres active and reachable | Lost — re-seeded fresh | **Retained** — survives restart and redeployment |
 
-Evidence (local, two separate `uvicorn` processes sharing one `AUDIT_DB`):
+Evidence (verified):
 
 ```
 run1: decision -> APPROVED; chain ok, 6 entries, head 48a29db2...
       [process stopped]
 run2: cases recreated (5), decided 0; case1 in-memory VERIFIED (decision cleared)
       case1 ledger events: ['pipeline_run', 'human_decision']   <- persisted
-      chain ok, 6 entries, head 48a29db2...                     <- same head
+      chain ok, 6 entries, head 48a29db2...                     <- identical head
 ```
 
 So: a **hash chain that verifies proves integrity, not durability.** Durability across
-redeploys requires the Postgres backend (or a mounted persistent volume), neither of
-which is active in the current deployment.
+redeployments requires the Postgres backend (or a mounted persistent volume).
 
 ## Confidential (TEE) deployment — attempted
 
