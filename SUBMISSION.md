@@ -129,20 +129,20 @@ Capture 1, 8 and 12 as the reliability set; 3, 6, 9 and 10 as the human-in-the-l
 
 ---
 
-## 5. Verified production status (17 Oct 2026, 07:40 PKT)
+## 5. Verified production status (17 Oct 2026, 09:35 PKT)
 
 | Check | Result |
 |---|---|
-| Deployed image | updated after the final deploy (see the commit tag) |
-| Repository HEAD | the commit tagged for this submission |
-| `/health` | 200, `gate.all_passed: true` (55/55), grounding 0.971, abstain 0.6, `no_auto_deny: true` |
+| Deployed image | `9f7ec40808eb` (`9f7ec40`, `v0.5.0`) |
+| Repository HEAD | `9f7ec40` |
+| `/health` | 200, `version 0.5.0`, `gate.all_passed: true` (55/55), grounding 0.971, abstain 0.6, `no_auto_deny: true` |
 | All GET endpoints (`/`, `/api/info`, `/api/adapters`, `/api/cases`, `/api/policy`, `/api/eval`, `/api/metrics`, `/api/audit/verify`, `/api/diag`) | 200 |
 | Intake -> assign -> decision (approve) | 200, status `APPROVED`, audit entries written |
 | Unknown-case audit | 404 |
 | Decision with empty reason | 400 |
 | Tamper demo | intact -> forged copy detected at the changed entry -> real ledger intact |
 | Seed source | `files:/app/data/cases` (data ships in the image) |
-| `/api/metrics` | `requests_total`, `by_status`, `latency_ms.p50/p95`, gate and case counters |
+| Interface | New casework console: queue, tabs, sticky decision panel, policy, quality, about |
 | Local test suites | 7/7 pass (adds `tests/test_regressions.py`) |
 
 **Storage:** an append-only, hash-chained SQLite ledger stored beside the application.

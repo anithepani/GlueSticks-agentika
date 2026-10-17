@@ -1,6 +1,6 @@
 # Witness - demo runbook (video + screenshots)
 
-Written against the redesigned console (v0.5.0). Every navigation step below matches the
+Written against the redesigned console (v0.5.0, image 9f7ec40). Every navigation step below matches the
 live interface.
 
 - **Primary URL:** https://alternate-echo-whale-5578-github-app.alternatefutures.ai

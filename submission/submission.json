@@ -1,0 +1,43 @@
+{
+  "team": {
+    "name": "Glue Sticks",
+    "members": [
+      {
+        "name": "Aryan Zia",
+        "email": "aryanzia2005@gmail.com",
+        "discord": "anithepani"
+      },
+      {
+        "name": "Muhammad Rubait Zakria",
+        "email": "rubait2006@gmail.com",
+        "discord": "[ADD DISCORD USERNAME]"
+      }
+    ],
+    "whatsapp": "[ADD WHATSAPP NUMBER]"
+  },
+  "project": {
+    "name": "Witness",
+    "pitch": "A human-in-the-loop decision desk that screens benefits applications with grounded AI and requires a named officer to decide.",
+    "problem": "Public benefits screening is high-volume and high-stakes, yet fully automated scoring puts the cost of error on the applicant: a wrong denial has no owner and no reviewable basis. Witness keeps the model advisory, makes every rule deterministic, and makes a named officer accountable for every final decision.",
+    "human": "The human is a structural stage, not a reviewer bolted on afterwards. The automated pipeline can reach Verified or Needs review; it has no code path that produces a denial. A final decision requires an officer name and a written reason, which are appended to a hash-chained ledger. When evidence is missing, contradictory or uncited, the verifier abstains and escalates the case instead of guessing. The model may only make the outcome more cautious, never less.",
+    "built_with": "Python and FastAPI, deployed on Alternate Clouds from a public GitHub repository. Fact extraction uses Groq's llama-3.3-70b-versatile with verbatim-quote grounding; if the model is unavailable it falls back to a deterministic label reader. Policy is evaluated by a deterministic seven-clause rules engine in code. PDF text extraction uses pypdf. The audit ledger is an append-only SHA-256 hash chain in SQLite. No n8n workflow; no MCP servers."
+  },
+  "links": {
+    "live": "https://alternate-echo-whale-5578-github-app.alternatefutures.ai",
+    "repo": "https://github.com/anithepani/GlueSticks-agentika",
+    "video": "[ADD UNLISTED YOUTUBE OR DRIVE LINK]",
+    "linkedin_post": "[ADD LINKEDIN POST LINK]",
+    "linkedin_reshare": "[ADD RESHARE LINK]",
+    "x_post": ""
+  },
+  "screenshots": {
+    "discord": "submission/shots/discord.png",
+    "clouds": "submission/shots/clouds.png",
+    "app": [
+      "submission/shots/app-queue.png",
+      "submission/shots/app-evidence.png",
+      "submission/shots/app-conflict.png",
+      "submission/shots/app-quality.png"
+    ]
+  }
+}
