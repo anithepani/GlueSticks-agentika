@@ -114,25 +114,6 @@ errors or rate-limits mid-demo — Witness falls back to the deterministic
 label/fixture path, so a case is never dropped. Check `GET /api/adapters` to confirm
 what is live, and `GET /api/eval` to confirm the gate still passes.
 
-## Postgres audit ledger (optional; prerequisites for cross-redeploy durability)
-
-The SQLite ledger lives inside the container filesystem, which is **ephemeral**: it
-survives a process restart (verified) but **not** a redeploy / container replacement
-(no persistent volume is mounted). For a durable ledger, deploy the managed Postgres
-template and link it:
-
-```powershell
-npx -y @alternatefutures/acc services create --kind template --template postgres --name witness-db -y
-npx -y @alternatefutures/acc services -p witness-agentika link witness-db alternate-echo-whale-5578-github
-npx -y @alternatefutures/acc services -p witness-agentika info cmvbc3e5706exe41rs9g87kmn
-```
-
-Linking injects the connection string into the app service (as `DATABASE_URL` /
-`POSTGRES_URL`). Set `AUDIT=postgres`, **Rebuild → Deploy**, then confirm with:
-
-- `GET /api/adapters` → `audit_active` is `postgres` or `postgres(fallback:sqlite)` and `audit_degraded` is `false`
-- `GET /api/audit/verify` → `{"ok": true, "ledger": "postgres", ...}`
-
 ## Docker architecture
 
 - **Image build:** The application is built from `Dockerfile` on `python:3.12-slim`.
@@ -175,12 +156,71 @@ Because `try_postgres()` catches connection errors and `ResilientAudit` guards l
 - `/api/adapters` truthfully reports `audit_requested: "postgres"`, `audit_active: "sqlite"`, `audit_degraded: true`, and `audit_note: "requested 'postgres' but running 'sqlite' (backend unreachable)"`.
 - `/api/audit/verify` re-computes the tamper-evident hash chain on the active SQLite ledger (`ledger: "sqlite"`).
 
-### Recommended path for cross-redeploy persistence
+### Root cause (evidence, re-verified from the running deployments)
 
-For production durability across container replacements:
-1. Provide an external managed PostgreSQL connection URI (e.g. from Neon, Supabase, or AWS RDS with TLS enabled) in the Alternate Clouds dashboard under **Settings → Environment Variables → `DATABASE_URL`**.
-2. Run `powershell -ExecutionPolicy Bypass -File tools/redeploy.ps1`.
-3. Confirm via `GET /api/adapters` that `audit_active` reports `postgres` and `audit_degraded` reports `false`.
+1. **Both services exist and are on different Akash providers.** The app runs on
+   `akash1aaul837r7en7hpk9wv2svg8u78fdq0t2j2e82z` (`provider.h6i-dedicated.eu-se-1.digitalfrontier.so`,
+   pod CIDR `10.42.x`); `witness-db` runs on `akash16yr3wxt97ae045a06kr3ycde9srcgpg8syjxxm`
+   (`provider.zencloud.eu`, pod CIDR `10.233.x`). Two providers = two independent
+   Kubernetes clusters with no shared private network.
+2. **The link only injects environment variables.** AF's own glossary: *"Service link -
+   a connection between two services in the same project that exposes the target's
+   address to the source as environment variables."* It does not create a route. The
+   injected `DATABASE_URL`/`PGHOST` is `witness-db.witness-agentika.internal`.
+3. **That name cannot resolve outside the database's own cluster.**
+   From the app: `socket.gaierror: [Errno -2] Name or service not known`. The same name
+   is NXDOMAIN from the public internet. Inside the DB's cluster the service is
+   `witness-db-np` (`10.233.47.52:5432`), and its DNS zone is the provider's own
+   (`zc.internal`), which the app's cluster does not share.
+4. **The declared public port is not actually reachable.** The template catalog lists
+   Postgres as `5432 (public)`, but from the app (which has working egress - it reaches
+   `api.groq.com:443`) and from the public internet, `provider.zencloud.eu:5432` times
+   out, and `witness-db-app.alternatefutures.ai:5432` is unreachable (Cloudflare fronts
+   HTTP only). No working public TCP endpoint exists for this deployment.
+5. **AF has no provider pinning.** `acc services deploy` offers only `--region`; there is
+   no flag to place a service on a specific provider or to attach two existing services
+   to one private network. The only supported shared-network mechanism is a **composite
+   template** (several services deployed *together*), which the docs state is **web-app
+   only** and which builds a fixed template stack, not our custom app.
+
+Conclusion: with the existing two separate services, there is **no supported way** to
+give the app private access to `witness-db`. This is a platform placement limitation,
+not a Witness defect and not a credential problem.
+
+### Database state (checked, read-only)
+
+`psql -U witness -d appdb -c '\dt'` in the DB container returns
+`Did not find any relations.` - `appdb` has **no tables**, so the app has never written
+and **there is no audit data at risk**. (The DB is otherwise healthy: `select(1)` -> `1`,
+and it accepts local socket connections.)
+
+### How Witness handles degradation
+
+Because `try_postgres()` catches connection errors and `ResilientAudit` guards ledger writes:
+- The service **never crashes** when Postgres is unreachable.
+- The service **never drops a case** or suppresses audit records.
+- `/api/adapters` truthfully reports `audit_requested: "postgres"`, `audit_active: "sqlite"`, `audit_degraded: true`, and an `audit_note`.
+- `/api/audit/verify` re-computes the tamper-evident hash chain on the active SQLite ledger (`ledger: "sqlite"`).
+
+### Options for cross-redeploy persistence (no external provider, no DB replacement)
+
+Ordered by risk. **None is applied by default; each needs approval.**
+
+1. **Keep SQLite (current state).** No production change. Honest, safe, but the ledger
+   does not survive a redeploy. This is the recommended default until AF supports
+   cross-provider linking.
+2. **Ask AF support for same-provider placement.** The real fix is for the platform to
+   place linked services on one provider (or expose a supported private endpoint). This
+   is the only path that keeps the existing `witness-db`.
+3. **Re-create the pair as one composite deployment.** A composite template shares one
+   network, so the `.internal` name resolves. It creates a *new* Postgres (the current
+   one is empty, so no data is lost) and is **web-app only**; it would not run our custom
+   app image unless AF publishes a suitable composite. Needs approval and is not
+   achievable with the current CLI.
+
+Do **not** point `DATABASE_URL` at Neon/Supabase/RDS or any external provider: that is a
+different architecture and was explicitly out of scope.
+
 
 ## Persistence — what actually survives (verified)
 
@@ -223,18 +263,20 @@ confidential VM offer at the time), so the TEE deployment is documented as a
 service is never used as the guinea pig for this: TEE is always tried on a
 duplicate service so the submission URL stays up.
 
-**Current status (this environment): not verified, blocked.** Two attempts, identical
-incorrect configuration was not repeated a third time. The failure is at provider
-placement/start of a Confidential VM, not in Witness code. Retrying requires:
+**Current status: DEFERRED (blocked on hardware).** Two attempts failed with `CVM failed`;
+an unchanged configuration was not retried a third time. The failure is at provider
+placement/start of a Confidential VM, not in Witness code.
 
-1. `acc login --email` (the CLI in this workspace is currently **unauthenticated**, so
-   no deploy/attest/log command can run),
-2. a region/provider that actually offers a TEE-capable node, and
-3. the same duplicate-service approach so the production URL is untouched.
+TODO (CVM/TEE) - requirements for a future retry:
+1. a region/provider that actually offers a TEE-capable node (`acc regions` shows
+   availability), and
+2. the same duplicate-service approach so the production URL is untouched.
 
-If it succeeds, verify with `npx -y @alternatefutures/acc attest <tee-service-id>` (add
-`--verify` if the installed CLI supports it). Until then, **do not claim TEE protection
-or remote attestation.** The application never depends on confidential compute.
+The CLI is authenticated now, so the remaining blocker is hardware availability only.
+If a retry succeeds, verify with `npx -y @alternatefutures/acc attest <tee-service-id>`
+(add `--verify` if the installed CLI supports it). Until then, **do not claim TEE
+protection or remote attestation.** The application never depends on confidential
+compute.
 
 ---
 

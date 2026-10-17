@@ -27,6 +27,14 @@ SLA_HOURS = float(os.getenv("WITNESS_SLA_HOURS", "24"))
 OPEN_STATUSES = ("INTAKE", "VERIFIED", "NEEDS_REVIEW", "INFO_REQUESTED")
 
 
+class AuditWriteError(RuntimeError):
+    """Raised when a state change could not be durably recorded in the audit ledger.
+
+    Callers must treat this as "not recorded": the in-memory state is left unchanged
+    so a decision never appears to have succeeded without an audit entry.
+    """
+
+
 def age_minutes(case: Case, now: datetime | None = None) -> float:
     try:
         received = datetime.fromisoformat(case.received_at)
@@ -86,9 +94,8 @@ class CaseStore:
             packet = self._intake_packet(payload)
             extractor = intake_extractor()
             case = run_pipeline(packet, self._bundle, extractor=extractor)
-            self._cases[case.id] = case
-            case.log("intake_submitted", f"case created via API with {len(case.documents)} document(s)")
-            self._bundle.audit.append(
+            # Durable first: the case is only registered if its intake is audited.
+            self._append_or_raise(
                 case.id,
                 "intake",
                 "officer",
@@ -98,6 +105,8 @@ class CaseStore:
                     "extractor": extractor.name,
                 },
             )
+            self._cases[case.id] = case
+            case.log("intake_submitted", f"case created via API with {len(case.documents)} document(s)")
             self._record_pipeline(case)
             return case
 
@@ -127,6 +136,18 @@ class CaseStore:
                 "documents": existing + cleaned,
             }
             updated = run_pipeline(packet, self._bundle, extractor=intake_extractor())
+            # Durable first: only reopen the case once the resubmission is recorded.
+            self._append_or_raise(
+                case.id,
+                "resubmit",
+                "officer",
+                {
+                    "documents": len(cleaned),
+                    "status": updated.status,
+                    "verification": updated.verification.status,
+                    "outcome": updated.recommendation.outcome,
+                },
+            )
             case.documents = updated.documents
             case.facts = updated.facts
             case.rules = updated.rules
@@ -136,17 +157,6 @@ class CaseStore:
             case.decision = None
             case.touch()
             case.log("resubmit", f"{len(cleaned)} new document(s); pipeline re-run -> {case.status}")
-            self._bundle.audit.append(
-                case.id,
-                "resubmit",
-                "officer",
-                {
-                    "documents": len(cleaned),
-                    "status": case.status,
-                    "verification": case.verification.status,
-                    "outcome": case.recommendation.outcome,
-                },
-            )
             return case
 
     def _intake_packet(self, payload: dict) -> dict:
@@ -202,20 +212,37 @@ class CaseStore:
             serial += 1
         return f"INTK-{serial:04d}"
 
+    def _append_or_raise(self, case_id: str, event: str, actor, payload: dict) -> dict:
+        """Append an audit entry, converting any failure into AuditWriteError.
+
+        Used for state-changing operations so the caller can guarantee that a change
+        is only applied after it is durably recorded.
+        """
+        try:
+            return self._bundle.audit.append(case_id, event, actor, payload)
+        except Exception as exc:
+            raise AuditWriteError(f"audit write failed for {case_id}/{event}: {exc}") from exc
+
     def _record_pipeline(self, case: Case) -> None:
-        if self._bundle.audit.has_event(case.id, "pipeline_run"):
+        # Best-effort: the pipeline_run marker is informational. A failure here must
+        # not stop the service from starting or a case from being created; the ledger
+        # is still verified independently by /api/audit/verify.
+        try:
+            if self._bundle.audit.has_event(case.id, "pipeline_run"):
+                return
+            self._bundle.audit.append(
+                case.id,
+                "pipeline_run",
+                "system",
+                {
+                    "status": case.status,
+                    "outcome": case.recommendation.outcome,
+                    "verification": case.verification.status,
+                    "rules": {rule.rule_id: rule.status for rule in case.rules},
+                },
+            )
+        except Exception:
             return
-        self._bundle.audit.append(
-            case.id,
-            "pipeline_run",
-            "system",
-            {
-                "status": case.status,
-                "outcome": case.recommendation.outcome,
-                "verification": case.verification.status,
-                "rules": {rule.rule_id: rule.status for rule in case.rules},
-            },
-        )
 
     def list(self) -> list[Case]:
         with self._lock:
@@ -252,11 +279,12 @@ class CaseStore:
             officer = (officer or "").strip()
             if not officer:
                 raise ValueError("officer name is required")
+            # Record first, mutate second: a failed write must not change state.
+            self._append_or_raise(case.id, "assigned", officer, {"assignee": officer})
             case.assignee = officer
             case.assigned_at = _now()
             case.touch()
             case.log("assigned", f"assigned to {officer}")
-            self._bundle.audit.append(case.id, "assigned", officer, {"assignee": officer})
             return case
 
     def decide(self, case_id: str, officer: str, action: str, reason: str) -> Case:
@@ -277,25 +305,29 @@ class CaseStore:
 
             verification_status = case.verification.status if case.verification else None
             outcome = case.recommendation.outcome if case.recommendation else None
-            overrode_abstention = verification_status == "ABSTAIN"
+            new_status = FINAL_BY_ACTION[action]
+            decided_at = _now()
 
-            case.decision = Decision(officer=officer, action=action, reason=reason, decided_at=_now())
-            case.status = FINAL_BY_ACTION[action]
-            case.touch()
-            case.log("human_decision", f"{action} by {officer}")
-            self._bundle.audit.append(
+            # Durability first: if the ledger write fails, the case is left untouched
+            # and the request surfaces as "not recorded" instead of a phantom approval.
+            self._append_or_raise(
                 case.id,
                 "human_decision",
                 officer,
                 {
                     "action": action,
                     "reason": reason,
-                    "status": case.status,
+                    "status": new_status,
                     "outcome": outcome,
                     "verification": verification_status,
-                    "overrode_abstention": overrode_abstention,
+                    "overrode_abstention": verification_status == "ABSTAIN",
                 },
             )
+
+            case.decision = Decision(officer=officer, action=action, reason=reason, decided_at=decided_at)
+            case.status = new_status
+            case.touch()
+            case.log("human_decision", f"{action} by {officer}")
             return case
 
     def stats(self) -> dict:

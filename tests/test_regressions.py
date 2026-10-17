@@ -393,6 +393,104 @@ def test_sensitive_values_never_exposed_in_api():
     print("OK: sensitive keys and connection passwords never appear in API responses")
 
 
+def test_decision_not_applied_when_audit_write_fails():
+    """A decision must never appear to succeed if its audit entry was not recorded."""
+    store, bundle = fresh_store("auditfail")
+    case = store.add_case({"applicant_name": "Audit Fail", "documents": [{"title": "Form", "text": FORM}]})
+
+    from app.config import AdapterBundle
+    from app.store import AuditWriteError
+
+    class RaisingAudit:
+        name = "sqlite"
+
+        def append(self, *a, **k):
+            raise RuntimeError("ledger unavailable")
+
+        def entries(self, case_id=None):
+            return []
+
+        def has_event(self, *a, **k):
+            return False
+
+        def case_ids(self):
+            return set()
+
+        def verify(self):
+            return {"ok": True, "checked": 0, "total": 0}
+
+    store._bundle = AdapterBundle(
+        reader=bundle.reader,
+        extractor=bundle.extractor,
+        rules=bundle.rules,
+        verifier=bundle.verifier,
+        audit=RaisingAudit(),
+    )
+
+    try:
+        store.decide(case.id, "Officer A", "approve", "Attempting with a broken ledger.")
+        raise AssertionError("expected AuditWriteError")
+    except AuditWriteError:
+        pass
+
+    after = store.get(case.id)
+    assert after.status == "VERIFIED", after.status
+    assert after.decision is None, after.decision
+    print("OK: failed audit write leaves the case undecided (no phantom approval)")
+
+
+def test_decision_api_returns_503_when_audit_write_fails():
+    from fastapi.testclient import TestClient
+    import app.main as main
+    from app.config import AdapterBundle
+
+    class RaisingAudit:
+        name = "sqlite"
+
+        def append(self, *a, **k):
+            raise RuntimeError("ledger unavailable")
+
+        def entries(self, case_id=None):
+            return []
+
+        def has_event(self, *a, **k):
+            return False
+
+        def case_ids(self):
+            return set()
+
+        def verify(self):
+            return {"ok": True, "checked": 0, "total": 0}
+
+    with TestClient(main.app) as client:
+        created = client.post(
+            "/api/cases",
+            json={"applicant_name": "Audit Failure API", "documents": [{"title": "Form", "text": FORM}]},
+        )
+        assert created.status_code == 200, created.text
+        case_id = created.json()["id"]
+
+        store = client.app.state.store
+        original = store._bundle
+        store._bundle = AdapterBundle(
+            reader=original.reader,
+            extractor=original.extractor,
+            rules=original.rules,
+            verifier=original.verifier,
+            audit=RaisingAudit(),
+        )
+        try:
+            response = client.post(
+                f"/api/cases/{case_id}/decision",
+                json={"officer": "Officer A", "action": "approve", "reason": "Broken ledger attempt."},
+            )
+            assert response.status_code == 503, (response.status_code, response.text)
+            assert store.get(case_id).decision is None, "case must not be approved without an audit entry"
+        finally:
+            store._bundle = original
+    print("OK: decision endpoint returns 503 and does not approve when the audit write fails")
+
+
 def main() -> int:
     test_concurrent_decision_is_serialized()
     test_intake_id_does_not_collide_after_reseed()
@@ -400,6 +498,8 @@ def main() -> int:
     test_decision_override_is_recorded()
     test_api_error_and_status_paths()
     test_llm_transport_failure_falls_back_end_to_end()
+    test_decision_not_applied_when_audit_write_fails()
+    test_decision_api_returns_503_when_audit_write_fails()
     test_tamper_demo_on_empty_ledger()
     test_audit_persistence_across_restart()
     test_resilient_audit_runtime_outage_fallback()

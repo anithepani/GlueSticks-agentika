@@ -23,7 +23,7 @@ from app.config import CASES_DIR, POLICY_DIR, STAGE, build_adapters, describe_ad
 from app.evaluation import evaluate
 from app.observability import Metrics, log_json
 from app.policy import POLICY_MARKDOWN
-from app.store import CaseStore
+from app.store import AuditWriteError, CaseStore
 from app.tamper_demo import tamper_demo
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -162,6 +162,8 @@ def list_cases(request: Request) -> dict:
 def create_case(payload: IntakeIn, request: Request) -> dict:
     try:
         case = _store(request).add_case(payload.model_dump())
+    except AuditWriteError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return case.to_dict()
@@ -173,6 +175,8 @@ def resubmit(case_id: str, payload: ResubmitIn, request: Request) -> dict:
         case = _store(request).resubmit(case_id, [doc.model_dump() for doc in payload.documents])
     except KeyError:
         raise HTTPException(status_code=404, detail="case not found")
+    except AuditWriteError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return case.to_dict()
@@ -184,6 +188,8 @@ def assign(case_id: str, payload: AssignIn, request: Request) -> dict:
         case = _store(request).assign(case_id, payload.officer)
     except KeyError:
         raise HTTPException(status_code=404, detail="case not found")
+    except AuditWriteError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return case.to_dict()
@@ -208,6 +214,8 @@ def decide(case_id: str, payload: DecisionIn, request: Request) -> dict:
         case = _store(request).decide(case_id, payload.officer, payload.action, payload.reason)
     except KeyError:
         raise HTTPException(status_code=404, detail="case not found")
+    except AuditWriteError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return case.to_dict()
