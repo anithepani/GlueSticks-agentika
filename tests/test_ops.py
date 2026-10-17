@@ -99,7 +99,10 @@ def test_metrics_and_request_id():
         assert metrics["by_status"].get("200", 0) >= 3, metrics
         assert metrics["gate"]["all_passed"] is True, metrics
         assert metrics["cases"]["total"] == 5
-        print(f"OK: metrics + request IDs work — {metrics['requests_total']} requests, by_status {metrics['by_status']}")
+        latency = metrics["latency_ms"]
+        assert latency["samples"] >= 3 and latency["p50"] >= 0 and latency["p95"] >= latency["p50"], metrics
+        print(f"OK: metrics + request IDs work - {metrics['requests_total']} requests, by_status {metrics['by_status']}, "
+              f"p50={latency['p50']}ms p95={latency['p95']}ms")
 
 
 def main() -> int:

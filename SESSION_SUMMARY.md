@@ -31,8 +31,15 @@
   * **Live URL:** [https://alternate-echo-whale-5578-github-app.alternatefutures.ai](https://alternate-echo-whale-5578-github-app.alternatefutures.ai)
   * **Project ID:** `witness-agentika`
   * **Service ID:** `alternate-echo-whale-5578-github` (`cmvbc3e5706exe41rs9g87kmn`)
-  * **Live Git Commit:** `e7904e2` (`v0.4.0`, Stage 4)
-  * **Evaluation Gate:** 55/55 tests passed (`all_passed: true`, `no_auto_deny: true`)
+  * **Repository HEAD:** `8c0478e` (`feat(ui): System & Adapters view`)
+  * **Deployed image:** `8c0478e9dbb6` (`8c0478e`, `v0.4.0`) — verified 17 Oct 2026, 07:47 PKT
+  * **Evaluation Gate:** 55/55 expectations passed (`all_passed: true`, `no_auto_deny: true`)
+  * **Last verified:** 17 Oct 2026, 07:40 PKT — `/health` 200, all GET endpoints 200,
+    `seed_source: files:/app/data/cases`, audit `sqlite` (requested `postgres`, degraded).
+
+> Status numbers below (rubric scores, live commit, "data/ not copied") are a **snapshot at
+> the end of the first session** and are kept for history. The block above is the current,
+> re-verified state.
 
 ---
 
@@ -59,29 +66,29 @@ Witness runs as a single FastAPI service listening on `PORT=8000` inside a Docke
 * Established Alternate Clouds deployment pipeline on branch `main`.
 
 ### Stage 1: Walking Skeleton & Core HITL Pipeline
-* **Synthetic Cases:** 5 seeded demo cases in [`data/cases/`](file:///d:/Hackathons/GlueSticks-agentika/data/cases/) with static embedded fallbacks in [`app/embedded.py`](file:///d:/Hackathons/GlueSticks-agentika/app/embedded.py).
-* **Deterministic Rules:** [`app/adapters/rules_pmt.py`](file:///d:/Hackathons/GlueSticks-agentika/app/adapters/rules_pmt.py) checks rule passes/fails deterministically without LLM hallucinations.
-* **Deterministic Verifier:** [`app/adapters/verifier_det.py`](file:///d:/Hackathons/GlueSticks-agentika/app/adapters/verifier_det.py) enforces abstention (`NEEDS_REVIEW`) on missing mandatory fields or contradictions.
-* **Immutable Audit Ledger:** [`app/adapters/audit_sqlite.py`](file:///d:/Hackathons/GlueSticks-agentika/app/adapters/audit_sqlite.py) hash-chains human approvals/denials. Tampering sequence or content breaks the chain (`/api/audit/verify`).
+* **Synthetic Cases:** 5 seeded demo cases in [`data/cases/`](https://github.com/anithepani/GlueSticks-agentika/tree/main/data/cases/) with static embedded fallbacks in [`app/embedded.py`](https://github.com/anithepani/GlueSticks-agentika/tree/main/app/embedded.py).
+* **Deterministic Rules:** [`app/adapters/rules_pmt.py`](https://github.com/anithepani/GlueSticks-agentika/tree/main/app/adapters/rules_pmt.py) checks rule passes/fails deterministically without LLM hallucinations.
+* **Deterministic Verifier:** [`app/adapters/verifier_det.py`](https://github.com/anithepani/GlueSticks-agentika/tree/main/app/adapters/verifier_det.py) enforces abstention (`NEEDS_REVIEW`) on missing mandatory fields or contradictions.
+* **Immutable Audit Ledger:** [`app/adapters/audit_sqlite.py`](https://github.com/anithepani/GlueSticks-agentika/tree/main/app/adapters/audit_sqlite.py) hash-chains human approvals/denials. Tampering sequence or content breaks the chain (`/api/audit/verify`).
 * **Human Gate:** Decisions require mandatory written reasons; double-decisions and automated rejections are blocked.
 
 ### Stage 2: Grounded Fact Extraction & Adversarial Verifier
-* **LLM Extractor:** [`app/adapters/extractor_llm.py`](file:///d:/Hackathons/GlueSticks-agentika/app/adapters/extractor_llm.py) extracts key-value pairs with exact verbatim quotes.
+* **LLM Extractor:** [`app/adapters/extractor_llm.py`](https://github.com/anithepani/GlueSticks-agentika/tree/main/app/adapters/extractor_llm.py) extracts key-value pairs with exact verbatim quotes.
 * **Verbatim Verification:** Deterministic matcher ensures extracted quotes exist identically in the source text; invented quotes are stripped.
-* **Adversarial LLM Verifier:** [`app/adapters/verifier_llm.py`](file:///d:/Hackathons/GlueSticks-agentika/app/adapters/verifier_llm.py) re-audits citations. Can add abstentions/flags, but cannot clear a deterministic failure.
+* **Adversarial LLM Verifier:** [`app/adapters/verifier_llm.py`](https://github.com/anithepani/GlueSticks-agentika/tree/main/app/adapters/verifier_llm.py) re-audits citations. Can add abstentions/flags, but cannot clear a deterministic failure.
 * **Safe Fallbacks:** Degrades seamlessly to label/fixture extractors if LLM keys are unset or rate-limited.
 
 ### Stage 3: Runtime Intake & UI Decision Desk
 * **Intake API:** `POST /api/cases` takes plain text or structured JSON packets.
-* **Decision Desk UX:** [`app/static/index.html`](file:///d:/Hackathons/GlueSticks-agentika/app/static/index.html) single-page dashboard featuring evidence panels, conflict highlights, rule checklists, and a `request_info → resubmit` loop.
+* **Decision Desk UX:** [`app/static/index.html`](https://github.com/anithepani/GlueSticks-agentika/tree/main/app/static/index.html) single-page dashboard featuring evidence panels, conflict highlights, rule checklists, and a `request_info → resubmit` loop.
 
 ### Stage 4: Hardening, Breadth & Platform Integrations (P1–P7)
-* **P4 — Policy Traceability:** Expanded to **7 statutory clauses** in [`data/policy/rules.md`](file:///d:/Hackathons/GlueSticks-agentika/data/policy/rules.md) and [`app/policy.py`](file:///d:/Hackathons/GlueSticks-agentika/app/policy.py). Each rule row in the UI cites its specific clause.
+* **P4 — Policy Traceability:** Expanded to **7 statutory clauses** in [`data/policy/rules.md`](https://github.com/anithepani/GlueSticks-agentika/tree/main/data/policy/rules.md) and [`app/policy.py`](https://github.com/anithepani/GlueSticks-agentika/tree/main/app/policy.py). Each rule row in the UI cites its specific clause.
 * **P5 — Fail-Closed Evaluation Gate & Tamper Demo:** 
   * Startup test suite verifies 55 golden cases and invariant tests.
   * `POST /api/audit/tamper-demo` demonstrates cryptographic ledger failure on an isolated temporary clone.
-* **P1 — Resilient Multi-Service Postgres:** [`app/adapters/audit_postgres.py`](file:///d:/Hackathons/GlueSticks-agentika/app/adapters/audit_postgres.py) with [`app/adapters/resilient.py`](file:///d:/Hackathons/GlueSticks-agentika/app/adapters/resilient.py) (`ResilientAudit`), automatically falling back to SQLite if Postgres is unreachable.
-* **P3 — PDF Intake:** [`app/adapters/reader_pdf.py`](file:///d:/Hackathons/GlueSticks-agentika/app/adapters/reader_pdf.py) using `pypdf` for page-aware extraction.
+* **P1 — Resilient Multi-Service Postgres:** [`app/adapters/audit_postgres.py`](https://github.com/anithepani/GlueSticks-agentika/tree/main/app/adapters/audit_postgres.py) with [`app/adapters/resilient.py`](https://github.com/anithepani/GlueSticks-agentika/tree/main/app/adapters/resilient.py) (`ResilientAudit`), automatically falling back to SQLite if Postgres is unreachable.
+* **P3 — PDF Intake:** [`app/adapters/reader_pdf.py`](https://github.com/anithepani/GlueSticks-agentika/tree/main/app/adapters/reader_pdf.py) using `pypdf` for page-aware extraction.
 * **P6 — Case Assignment & SLA Aging:** Caseworker assignments, due timestamps, and queue SLA breach indicators.
 * **P7 — Observability:** Request tracing via `x-request-id`, structured JSON access logs, and `/api/metrics`.
 
@@ -123,7 +130,10 @@ Active Production Endpoints:
 
 ## 7. Remaining Work & What to Proceed With Next
 
-The application code is complete and stable (scoring ~89–91/100 on the rubric). The remaining points are almost exclusively in the **mandatory submission deliverables** due before **12:45 PM PKT**:
+The application code is complete and stable. At the end of the first session the rubric
+self-assessment was ~89–91/100 (historical; see the current status block at the top). The
+remaining points are almost exclusively in the **mandatory submission deliverables** due
+before **12:45 PM PKT**:
 
 ### Immediate Priority Tasks (Deliverables)
 1. **2–3 Minute Demo Video:**

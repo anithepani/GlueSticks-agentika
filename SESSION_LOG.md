@@ -346,7 +346,8 @@ WITNESS_SLA_HOURS=24
 - **Live ledger is SQLite**, not Postgres: AF service linking is cluster-local and the two
   services landed on different clusters. The Postgres adapter exists and degrades safely.
 - **TEE not live**: `CVM failed` on confidential placement; documented as a supported path.
-- `data/` is not copied into the image; the embedded fallbacks cover it.
+- `data/` **is** copied into the image (`COPY data ./data` in the Dockerfile); the embedded
+  fallbacks remain as a second line of defence.
 - The seeded rule set is **simplified, synthetic and BISP-inspired** ΓÇö not official policy.
 - The intake label extractor assumes the standard form labels; anything else becomes
   `UNKNOWN` and correctly escalates to a human.
@@ -424,7 +425,7 @@ interactive login and hang. The two prior `CVM failed` attempts are documented; 
 attempt was made with an unchanged configuration. Requirements for a retry and the
 attestation command are recorded in `DEPLOY.md`. No TEE claim is made.
 
-### Production status at end of session 2 ΓÇö DOWN (lease gone)
+### Production status at end of session 2 (historical) ΓÇö DOWN (lease gone)
 
 Live verification succeeded partially, then the platform reported:
 
@@ -446,5 +447,29 @@ recover production itself. The committed code is `014406f`; the last image deplo
 
 Additional production observation: Cloudflare returns `403 error code: 1010` to clients that
 present a non-browser `User-Agent`; verification scripts must send a normal UA header.
+
+---
+
+## 18. Current verified status (17 Oct 2026, 07:40 PKT)
+
+The DOWN observation in §17 is **historical**. Production was restored and re-verified.
+
+| Check | Result |
+|---|---|
+| Live URL | 200 (main), 200 (fallback `witness-tee`) |
+| `/health` | `v0.4.0`, gate `all_passed: true` (55/55) |
+| `/api/eval` | grounding 0.971, abstain 0.6, `no_auto_deny: true` |
+| Seed source | `files:/app/data/cases` (data ships in the image) |
+| `/api/audit/verify` | chain intact, `ledger: sqlite` |
+| Repo HEAD | `8c0478e` |
+| Deployed image | `8c0478e9dbb6` (`8c0478e`, `v0.4.0`) — verified 07:47 PKT |
+| Audit storage | `audit_requested=postgres`, `audit_active=sqlite`, `audit_degraded=true` (unchanged) |
+
+- `witness-tee` is a **plain second deployment** of the same image (no TEE attestation);
+  it is kept as a failover URL during the demo window, not as a confidential deployment.
+- Local verification: all seven suites pass (`test_seed`, `test_llm`, `test_intake`,
+  `test_gate`, `test_pdf`, `test_ops`, `test_regressions`).
+- The new System & Adapters view reads `metrics.latency_ms.p50/p95`; the metrics endpoint
+  now returns those percentiles (fixed in this session).
 
 

@@ -127,17 +127,22 @@ Capture 1, 8, 9 and 10 as the "reliability/verifiability" set; 4, 5 and 6 as the
 
 ---
 
-## 5. Verified production status (at last check)
+## 5. Verified production status (17 Oct 2026, 07:40 PKT)
 
 | Check | Result |
 |---|---|
-| `/health` | 200, gate `all_passed: true` (55/55) |
+| Deployed image | `8c0478e9dbb6` (`8c0478e`, `v0.4.0`) |
+| Repository HEAD | `8c0478e` - UI "System & Adapters" view is live |
+| `/health` | 200, `gate.all_passed: true` (55/55), grounding 0.971, abstain 0.6, `no_auto_deny: true` |
 | All GET endpoints (`/`, `/api/info`, `/api/adapters`, `/api/cases`, `/api/policy`, `/api/eval`, `/api/metrics`, `/api/audit/verify`, `/api/diag`) | 200 |
 | Intake -> assign -> decision (approve) | 200, status `APPROVED`, audit entries written |
 | Unknown-case audit | 404 |
 | Decision with empty reason | 400 |
-| Tamper demo | intact 9 entries -> break detected at #9 -> real ledger intact |
+| Tamper demo | intact -> forged copy detected at the changed entry -> real ledger intact |
 | Seed source | `files:/app/data/cases` (data ships in the image) |
+| `/api/metrics` | `requests_total`, `by_status`, `latency_ms.p50/p95`, gate and case counters |
+| Local test suites | 7/7 pass (adds `tests/test_regressions.py`) |
+| Failover URL (not submitted) | `https://witness-tee-app.alternatefutures.ai` - same image, plain deployment, **no TEE attestation** |
 
 **Storage:** `audit_requested=postgres`, `audit_active=sqlite`, `audit_degraded=true`.
 The Postgres service exists and runs, but sits on a different Akash provider from the app,
